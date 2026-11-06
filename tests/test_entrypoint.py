@@ -300,6 +300,55 @@ class EntrypointTest(unittest.TestCase):
         self.run_entrypoint(env={**self.env, "JOSUI_TMUX": "1"})
         self.assertEqual((self.home / "tmux-args").read_text().splitlines(), ["has-session -t dev"])
 
+    def test_a_seat_gets_a_git_identity_when_one_is_given(self) -> None:
+        env = {**self.env, "JOSUI_GIT_NAME": "Josui", "JOSUI_GIT_EMAIL": "josui@crunchtools.com"}
+        self.assertEqual(self.run_entrypoint(env=env).returncode, 0)
+        self.assertEqual(self.git("--get", "user.name"), "Josui")
+        self.assertEqual(self.git("--get", "user.email"), "josui@crunchtools.com")
+        self.assertEqual(self.git("--get", "advice.detachedHead"), "false")
+
+    def test_an_identity_already_set_is_not_overwritten(self) -> None:
+        subprocess.run(
+            ["git", "config", "--global", "user.email", "someone@else"],
+            env={"HOME": str(self.home), "PATH": os.environ["PATH"]},
+            check=True,
+        )
+        env = {**self.env, "JOSUI_GIT_EMAIL": "josui@crunchtools.com"}
+        self.assertEqual(self.run_entrypoint(env=env).returncode, 0)
+        self.assertEqual(self.git("--get", "user.email"), "someone@else")
+
+    def test_no_git_identity_unless_one_is_given(self) -> None:
+        self.assertEqual(self.run_entrypoint().returncode, 0)
+        with self.assertRaises(subprocess.CalledProcessError):
+            self.git("--get", "user.name")
+
+    def test_mounted_env_files_are_installed_private(self) -> None:
+        src = self.config / "mcp-env"
+        src.mkdir()
+        key = src / "gatehouse.env"
+        key.write_text("OPENROUTER_API_KEY=sk-test\n")
+        key.chmod(0o644)
+        (src / "notes.txt").write_text("not an env file\n")
+        result = self.run_entrypoint()
+        self.assertEqual(result.returncode, 0, result.stderr)
+        dest = self.home / ".config/mcp-env"
+        self.assertEqual(stat.S_IMODE(dest.stat().st_mode), 0o700)
+        installed = dest / "gatehouse.env"
+        self.assertEqual(stat.S_IMODE(installed.stat().st_mode), 0o600)
+        self.assertEqual(installed.read_text(), "OPENROUTER_API_KEY=sk-test\n")
+        # Only *.env is taken, so a README beside the keys is not copied in.
+        self.assertFalse((dest / "notes.txt").exists())
+
+    def test_no_env_dir_means_nothing_happens(self) -> None:
+        self.assertEqual(self.run_entrypoint().returncode, 0)
+        self.assertFalse((self.home / ".config/mcp-env").exists())
+
+    def test_an_empty_env_dir_is_reported_not_fatal(self) -> None:
+        (self.config / "mcp-env").mkdir()
+        result = self.run_entrypoint()
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("has no *.env files", result.stderr)
+
     def test_no_tmux_session_unless_it_is_asked_for(self) -> None:
         self.fake_tmux()
         self.assertEqual(self.run_entrypoint().returncode, 0)
