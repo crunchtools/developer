@@ -62,8 +62,14 @@ while IFS= read -r line || [ -n "$line" ]; do
 done < "$config"
 
 [ -n "$rev" ] || die "no python-sdlc rev in $config"
+# A rev becomes a path component below, so it has to be one harmless name.
+# `/` is already outside the allowed characters, which leaves `.` and `..`:
+# `..` would resolve $CACHE/../bin/sdlc and run whatever sits beside the cache
+# instead of the pinned tool. Any other single component cannot escape.
 case "$rev" in
-  *[!A-Za-z0-9._-]* | "") die "refusing a python-sdlc rev that is not a plain tag: $rev" ;;
+  . | .. | *[!A-Za-z0-9._-]* | "")
+    die "refusing a python-sdlc rev that is not a plain tag: $rev"
+    ;;
 esac
 
 launcher="$CACHE/$rev/bin/sdlc"

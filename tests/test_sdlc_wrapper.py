@@ -106,6 +106,22 @@ class WrapperTest(unittest.TestCase):
         self.assertIn("not a plain tag", result.stderr)
         self.assertFalse(Path("/tmp/pwned").exists())
 
+    def test_a_dot_dot_rev_cannot_escape_the_cache(self) -> None:
+        # The rev is a path component, so `..` would run whatever sits beside
+        # the cache rather than the pinned tool.
+        outside = self.root / "bin"
+        outside.mkdir()
+        planted = outside / "sdlc"
+        planted.write_text('#!/bin/bash\ntouch "$HOME/escaped"\n')
+        planted.chmod(0o755)
+        for rev in ("..", "."):
+            with self.subTest(rev=rev):
+                self.write_config(rev=rev)
+                result = self.run_wrapper("push")
+                self.assertEqual(result.returncode, 2, result.stdout)
+                self.assertIn("not a plain tag", result.stderr)
+        self.assertFalse((self.root / "escaped").exists())
+
     def test_an_unreachable_rev_is_a_could_not_run(self) -> None:
         self.write_config(rev="v0.0.0-nope")
         result = self.run_wrapper("push")
