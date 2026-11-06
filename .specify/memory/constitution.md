@@ -1,6 +1,6 @@
 # developer Constitution
 
-> **Version:** 1.2.1
+> **Version:** 1.3.0
 > **Ratified:** 2026-11-06
 > **Status:** Active
 > **Inherits:** [crunchtools/constitution](https://github.com/crunchtools/constitution) v1.31.0
@@ -192,6 +192,7 @@ crunchtools/nagios-agent compares the two containers' start times and says so.
 
 | Version | Date | Changes |
 |---------|------|---------|
+| 1.3.0 | 2026-11-06 | The GHCR mirror pushes once the package grants this repo access, so the continue-on-error guard comes off; `permissions.defaultMode` measured redundant against the unit's `JOSUI_PERMISSION_MODE` and not shipped. RT#1556 |
 | 1.2.1 | 2026-11-06 | The GHCR mirror's failure explained correctly: the package exists and is linked to crunchtools/josui, so the fix is a grant, not a creation. RT#1556 |
 | 1.2.0 | 2026-11-06 | `sdlc` on PATH, resolving the rev the repo pins rather than any default, so a gate run by hand is the same tool CI runs. RT#1556 |
 | 1.1.0 | 2026-11-06 | A seat's `sdlc push` prerequisites move into the image: a git identity from the environment, and tool API keys from a read-only mcp-env mount. Layer 5 now names two credentials rather than one. Measured: 293s for trentina's push tier in a seat against 416s on the laptop. RT#1556 |
