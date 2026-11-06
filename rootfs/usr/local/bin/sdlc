@@ -1,0 +1,90 @@
+#!/bin/bash
+# Run the python-sdlc this repository pins, from an interactive shell.
+#
+# The pre-push hook finds `sdlc` because pre-commit manages its own cache; a
+# person typing in a seat's terminal does not, and `sdlc push` is the whole
+# reason this image carries a container engine. So: read the rev the repo pins,
+# clone that exact tag once, and exec its launcher.
+#
+# The rev is NOT a default or a floating branch. python-sdlc's own README is
+# explicit that the `rev:` line fixes the launcher, the image and every tool in
+# it, for this machine and for CI, which read the same line -- so a wrapper that
+# guessed a version would hand back a verdict CI does not share. If the line
+# cannot be read, this exits rather than choosing for you.
+set -euo pipefail
+
+REPO=${SDLC_WRAPPER_REPO:-https://github.com/crunchtools/python-sdlc}
+CACHE=${SDLC_WRAPPER_CACHE:-$HOME/.cache/crunchtools-sdlc}
+
+die() {
+  echo "sdlc: $*" >&2
+  exit 2 # a tool that could not run, in python-sdlc's own convention
+}
+
+root=$(git rev-parse --show-toplevel 2>/dev/null) ||
+  die "not inside a git repository, so there is no pinned python-sdlc to run"
+
+config="$root/.pre-commit-config.yaml"
+[ -f "$config" ] || die "$config does not exist, so this repo pins no python-sdlc"
+
+# The rev belongs to the python-sdlc entry, not to whichever repo is listed
+# first, so walk the file and only take `rev:` while inside that block.
+#
+# Pure bash, no awk: these tests run inside the python-sdlc image, which
+# carries neither awk nor jq. That cost a whole suite once already tonight.
+rev=
+in_sdlc=0
+trim_left() { printf '%s' "${1#"${1%%[![:space:]]*}"}"; }
+while IFS= read -r line || [ -n "$line" ]; do
+  trimmed=$(trim_left "$line")
+  case $trimmed in
+    "-"*repo:*)
+      url=${trimmed#*repo:}
+      url=$(trim_left "$url")
+      url=${url%%[[:space:]]*}
+      url=${url%.git}
+      case $url in
+        */python-sdlc) in_sdlc=1 ;;
+        *) in_sdlc=0 ;;
+      esac
+      ;;
+    rev:*)
+      [ "$in_sdlc" = 1 ] || continue
+      rev=${trimmed#rev:}
+      rev=${rev%%#*}
+      rev=$(trim_left "$rev")
+      rev=${rev%"${rev##*[![:space:]]}"}
+      rev=${rev//\"/}
+      rev=${rev//\'/}
+      break
+      ;;
+  esac
+done < "$config"
+
+[ -n "$rev" ] || die "no python-sdlc rev in $config"
+# A rev becomes a path component below, so it has to be one harmless name.
+# `/` is already outside the allowed characters, which leaves `.` and `..`:
+# `..` would resolve $CACHE/../bin/sdlc and run whatever sits beside the cache
+# instead of the pinned tool. Any other single component cannot escape.
+case "$rev" in
+  . | .. | *[!A-Za-z0-9._-]* | "")
+    die "refusing a python-sdlc rev that is not a plain tag: $rev"
+    ;;
+esac
+
+launcher="$CACHE/$rev/bin/sdlc"
+if [ ! -x "$launcher" ]; then
+  mkdir -p "$CACHE"
+  tmp="$CACHE/.$rev.$$"
+  rm -rf "$tmp"
+  # Through the gateway's git route, like every other clone here.
+  git clone --quiet --depth 1 --branch "$rev" "$REPO" "$tmp" ||
+    { rm -rf "$tmp"; die "cannot clone python-sdlc at $rev"; }
+  # Another shell may have won the race; last writer is the same content.
+  rm -rf "$CACHE/$rev"
+  mv "$tmp" "$CACHE/$rev"
+  [ -x "$launcher" ] || die "python-sdlc $rev has no bin/sdlc"
+  echo "sdlc: fetched python-sdlc $rev" >&2
+fi
+
+exec "$launcher" "$@"

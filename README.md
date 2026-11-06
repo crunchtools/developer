@@ -56,6 +56,15 @@ The point of this image is that `sdlc push` runs here in minutes instead of a
 CI round trip. Measured on a trentina clone, 2026-11-06: **293s in a seat
 against 416s on the laptop** for the same tier, the same night.
 
+`sdlc` is on `PATH`. It reads the `rev:` the repo pins for python-sdlc in
+`.pre-commit-config.yaml`, clones that exact tag once into
+`~/.cache/crunchtools-sdlc`, and execs its launcher — so a gate run by hand and
+the same gate in CI are the same tool. It never guesses a version: python-sdlc's
+own contract is that the `rev:` line fixes the launcher, the image and every
+tool in it, so a wrapper that defaulted would hand back a verdict CI does not
+share. Outside a repo, with no config, or with a rev that is not a plain tag, it
+exits 2 — "could not run", in python-sdlc's own convention.
+
 A seat needs four things before that tier can run at all. Each was a gate
 reporting `COULD NOT RUN` — the one verdict that must never be worked around —
 and each is now either done by the entrypoint or a documented step:
