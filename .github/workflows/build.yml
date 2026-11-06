@@ -176,6 +176,14 @@ jobs:
     runs-on: ubuntu-latest
     if: github.event_name != 'pull_request'
     timeout-minutes: 30
+    # Best effort, on purpose. ghcr.io/crunchtools/developer does not exist yet,
+    # and GITHUB_TOKEN cannot create an org package, so this push ends in
+    # "denied: permission_denied: write_package" until someone creates it once
+    # and gives this repo write access. Quay is what production pulls, and a
+    # default branch left red over a mirror teaches the fleet's red-branch
+    # alert to be ignored -- which costs more than the mirror is worth. Drop
+    # this line the moment the package exists. RT#1556
+    continue-on-error: true
     permissions:
       contents: read
       packages: write

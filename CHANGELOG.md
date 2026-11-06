@@ -6,6 +6,15 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Changed
+
+- The GHCR mirror push is `continue-on-error`. `ghcr.io/crunchtools/developer`
+  does not exist and `GITHUB_TOKEN` cannot create an org package, so that push
+  fails with `denied: permission_denied: write_package` on every merge. Quay is
+  what production pulls and it succeeds; a default branch left red over a mirror
+  only teaches the fleet's red-branch alert to be ignored. The guard comes off
+  when the package exists. RT#1556
+
 ## [1.1.0] - 2026-11-06
 
 ### Added
