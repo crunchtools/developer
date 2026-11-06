@@ -6,6 +6,23 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [1.2.1] - 2026-11-06
+
+### Fixed
+
+- **A wrong explanation, which is a defect in its own right.** The 1.2.0 note
+  and the workflow comment both said the GHCR mirror failed because
+  `ghcr.io/crunchtools/developer` did not exist and CI could not create it. The
+  package does exist, is publicly readable, and was created by
+  `crunchtools/josui` at 57c8e37 when this image lived there; it is still linked
+  to that repository, so this repo's `GITHUB_TOKEN` is granted nothing on it.
+
+  Left standing, that comment sends the next person to create a package that is
+  already there, watch the push fail again, and conclude the registry is broken.
+  The real fix is one grant on the existing package — its settings, Manage
+  Actions access, add `crunchtools/developer` with Write — after which the
+  `continue-on-error` guard comes off. RT#1556
+
 ## [1.2.0] - 2026-11-06
 
 ### Added
@@ -29,12 +46,19 @@ RT#1556
 
 ### Changed
 
-- The GHCR mirror push is `continue-on-error`. `ghcr.io/crunchtools/developer`
-  does not exist and `GITHUB_TOKEN` cannot create an org package, so that push
-  fails with `denied: permission_denied: write_package` on every merge. Quay is
-  what production pulls and it succeeds; a default branch left red over a mirror
-  only teaches the fleet's red-branch alert to be ignored. The guard comes off
-  when the package exists. RT#1556
+- The GHCR mirror push is `continue-on-error`. It fails with
+  `denied: permission_denied: write_package` on every merge. Quay is what
+  production pulls and it succeeds; a default branch left red over a mirror only
+  teaches the fleet's red-branch alert to be ignored. RT#1556
+
+  **Corrected in 1.2.1:** this entry first said the package did not exist and
+  that `GITHUB_TOKEN` could not create one. Both are wrong.
+  `ghcr.io/crunchtools/developer` exists and is publicly readable; it was
+  created by [crunchtools/josui](https://github.com/crunchtools/josui) at
+  57c8e37, when this image was that repo's `Containerfile.dev`, and is still
+  linked to that repository. The token here is scoped to this repo, which the
+  package grants nothing. The fix is a grant on the existing package, not a
+  creation.
 
 ## [1.1.0] - 2026-11-06
 
