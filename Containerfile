@@ -53,7 +53,7 @@
 #
 # Build happens in GitHub Actions (.github/workflows/build.yml).
 
-FROM quay.io/podman/stable@sha256:0ccbc4e7f79f9c33e7fc959be59f714abbc0f4c9cffbe14f5bceff537a014738
+FROM quay.io/podman/stable@sha256:f7a17ef911a2b9b866ada8a9426a07e29a6e4f8109ef8c0e0b7010c2541b4e49
 
 LABEL maintainer="fatherlinux <scott.mccarty@crunchtools.com>"
 LABEL description="developer - a crunchtools development agent: Claude Code with a toolchain and nested podman"
