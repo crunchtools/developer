@@ -1,6 +1,6 @@
 # developer Constitution
 
-> **Version:** 1.1.0
+> **Version:** 1.2.0
 > **Ratified:** 2026-11-06
 > **Status:** Active
 > **Inherits:** [crunchtools/constitution](https://github.com/crunchtools/constitution) v1.31.0
@@ -192,5 +192,6 @@ crunchtools/nagios-agent compares the two containers' start times and says so.
 
 | Version | Date | Changes |
 |---------|------|---------|
+| 1.2.0 | 2026-11-06 | `sdlc` on PATH, resolving the rev the repo pins rather than any default, so a gate run by hand is the same tool CI runs. RT#1556 |
 | 1.1.0 | 2026-11-06 | A seat's `sdlc push` prerequisites move into the image: a git identity from the environment, and tool API keys from a read-only mcp-env mount. Layer 5 now names two credentials rather than one. Measured: 293s for trentina's push tier in a seat against 416s on the laptop. RT#1556 |
 | 1.0.0 | 2026-11-06 | Extracted from josui 0.8.0, where this image was `Containerfile.dev`. Carries the measurements that justify its deviations: the five-capability set, `label=disable` with no AVC to replace it, `unmask=/proc/*`, the unprivileged UID map, and the fact that liveness is not monitorable from inside. RT#1556 |

@@ -6,6 +6,27 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [1.2.0] - 2026-11-06
+
+### Added
+
+- **`sdlc` on `PATH`.** The pre-push hook always found it, because pre-commit
+  manages its own cache; a person typing in a seat's terminal did not, and
+  running a repository's own gates by hand is what this image is for. The
+  wrapper reads the `rev:` the repo pins for python-sdlc, clones that exact tag
+  once into `~/.cache/crunchtools-sdlc`, and execs its launcher.
+
+  It never guesses a version. python-sdlc's contract is that the `rev:` line
+  fixes the launcher, the image and every tool in it for this machine and for
+  CI, which read the same line — so a wrapper that defaulted would hand back a
+  verdict CI does not share. No repo, no config, no python-sdlc entry, or a rev
+  that is not a plain tag all exit 2, which is python-sdlc's own "could not
+  run" and never to be worked around.
+
+  Closes the last item of crunchtools/developer#2.
+
+RT#1556
+
 ### Changed
 
 - The GHCR mirror push is `continue-on-error`. `ghcr.io/crunchtools/developer`
