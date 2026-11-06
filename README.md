@@ -17,6 +17,7 @@ rather than waiting for CI to render them.
 | state | `/home/podman` | Claude login, sessions, clones, caches. The only writable home. |
 | containers | `/home/podman/.local/share/containers` | The nested engine's storage. A **cache** — exclude it from backups. |
 | identity | `/etc/josui` (read-only) | `CLAUDE.md`, `settings.json`. Says what this agent is and what it is not. |
+| tool keys | `/etc/josui/mcp-env` (read-only) | `*.env` for the gates that take an API key. Installed to `~/.config/mcp-env` at 0600. Absent, the gates that need one say so. |
 | skills | `/var/lib/josui/josui-skills` | A git checkout, pulled at start. |
 | audit | `/var/log/josui` | One JSON line per tool call, plus Remote Control's debug file. |
 
@@ -48,6 +49,27 @@ the attaching terminal's size and survives the disconnect, which is why it is
 this and not `claude-agent attach`. The session is deliberately not watched:
 quitting your own shell must not end the container. Nothing listens for an
 inbound connection.
+
+## Running a repository's own gates
+
+The point of this image is that `sdlc push` runs here in minutes instead of a
+CI round trip. Measured on a trentina clone, 2026-11-06: **293s in a seat
+against 416s on the laptop** for the same tier, the same night.
+
+A seat needs four things before that tier can run at all. Each was a gate
+reporting `COULD NOT RUN` — the one verdict that must never be worked around —
+and each is now either done by the entrypoint or a documented step:
+
+| Need | Where it comes from |
+|------|---------------------|
+| a git identity | `JOSUI_GIT_NAME` and `JOSUI_GIT_EMAIL`, set by the entrypoint only if nothing is configured already |
+| Gatehouse's API key | an `*.env` file in the `/etc/josui/mcp-env` mount |
+| loopback out of the proxy | `NO_PROXY` must list `127.0.0.1,localhost,::1`. podman passes `HTTP(S)_PROXY` into every nested gate container by default, so without it a test talking to its own local server is tunnelled to the gateway and refused |
+| the constitution checkout | `sdlc`'s validator runs in the gate container with `HOME=/tmp`, so the gateway's `insteadOf` rewrite does not apply and its plain clone of `crunchtools/constitution` is refused by the egress proxy. Seed it once per inherited version, through the route that does work: `git clone --depth 1 -b <tag> https://github.com/crunchtools/constitution "$(podman volume inspect crunchtools-hook-cache --format '{{.Mountpoint}}')/constitution/<tag>"` |
+
+A gate that wants a host the gateway's allowlist does not carry fails here and
+nowhere else, and that is the design working. trentina's benchmark corpus
+(`huggingface.co`) is the known example.
 
 ## What this image costs, measured
 

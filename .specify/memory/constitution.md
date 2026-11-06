@@ -1,6 +1,6 @@
 # developer Constitution
 
-> **Version:** 1.0.0
+> **Version:** 1.1.0
 > **Ratified:** 2026-11-06
 > **Status:** Active
 > **Inherits:** [crunchtools/constitution](https://github.com/crunchtools/constitution) v1.31.0
@@ -121,7 +121,15 @@ from the `--debug-file`, not inferred.
 
 ## Layer 5 — Credential & Identity Management
 
-The agent holds one credential: the gateway's bearer token, from the env file.
+The agent holds two credentials. The gateway's bearer token, from the env
+file, is the one that matters: it is what the gateway identifies this seat by.
+The second is an API key for a gate that reviews code with an LLM —
+Gatehouse's, in `~/.config/mcp-env/gatehouse.env` — which arrives through a
+read-only mount at `/etc/josui/mcp-env`, never in the image and never in the
+environment, where `envscrub` would scrub it and the gate would then die
+reporting that it could not run. It buys nothing but reviews: it reaches one
+host already on this profile's egress allowlist and grants nothing on this
+host or in the fleet.
 Everything else is the gateway's — the GitHub token on its git route and in its
 GitHub tools, the LLM key for judging. The Claude login is personal, lives in
 the state volume, and is established once, interactively, per container;
@@ -184,4 +192,5 @@ crunchtools/nagios-agent compares the two containers' start times and says so.
 
 | Version | Date | Changes |
 |---------|------|---------|
+| 1.1.0 | 2026-11-06 | A seat's `sdlc push` prerequisites move into the image: a git identity from the environment, and tool API keys from a read-only mcp-env mount. Layer 5 now names two credentials rather than one. Measured: 293s for trentina's push tier in a seat against 416s on the laptop. RT#1556 |
 | 1.0.0 | 2026-11-06 | Extracted from josui 0.8.0, where this image was `Containerfile.dev`. Carries the measurements that justify its deviations: the five-capability set, `label=disable` with no AVC to replace it, `unmask=/proc/*`, the unprivileged UID map, and the fact that liveness is not monitorable from inside. RT#1556 |

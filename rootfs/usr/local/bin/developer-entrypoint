@@ -190,6 +190,52 @@ start_tmux_session() {
   log "tmux session 'dev' is up: podman exec -it <service> tmux attach -t dev"
 }
 
+# What a seat needs before `sdlc push` can run at all. Each of these was a
+# failure measured on developer3 against a trentina clone (RT#1556), not a
+# precaution: a seat without them reports a gate as "COULD NOT RUN", which is
+# the one verdict that must never be worked around.
+#
+# A git identity, because a seat starts with none and several gates commit or
+# diff. Only when nothing is configured already: a person who sets their own
+# in the state volume keeps it.
+set_git_identity() {
+  local name=${JOSUI_GIT_NAME:-} email=${JOSUI_GIT_EMAIL:-}
+  [ -n "$name" ] || [ -n "$email" ] || return 0
+  if [ -n "$name" ] && ! git config --global --get user.name > /dev/null 2>&1; then
+    git config --global user.name "$name"
+  fi
+  if [ -n "$email" ] && ! git config --global --get user.email > /dev/null 2>&1; then
+    git config --global user.email "$email"
+  fi
+  # A detached HEAD is normal here: a pinned tool is cloned at its tag.
+  git config --global advice.detachedHead false
+}
+
+# Env files for the tools that take a key, mounted read-only the way the
+# identity is. Gatehouse dies without ~/.config/mcp-env/gatehouse.env, and
+# that file holds an API key, so it belongs in a mount and not in the image
+# and not in this container's environment, where `envscrub` would find it.
+install_mcp_env() {
+  local src="$config_dir/mcp-env" dest="$HOME/.config/mcp-env" name
+  [ -d "$src" ] || return 0
+  mkdir -p "$dest"
+  chmod 0700 "$dest"
+  local found=0
+  for name in "$src"/*.env; do
+    [ -f "$name" ] || continue
+    install -m 0600 "$name" "$dest/$(basename "$name")"
+    found=$((found + 1))
+  done
+  if [ "$found" -eq 0 ]; then
+    log "$src has no *.env files"
+    return 0
+  fi
+  log "installed $found env file(s) from $src"
+}
+
+set_git_identity
+install_mcp_env
+
 cd "$workdir"
 # Remote Control redraws a terminal status screen on stdout every second.
 # Under a container runtime that is a line a second into the journal, so
