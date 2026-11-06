@@ -6,6 +6,30 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [1.3.0] - 2026-11-06
+
+### Fixed
+
+- **The GHCR mirror pushes, and the `continue-on-error` guard is gone.** Scott
+  added `crunchtools/developer` to the existing package's *Manage Actions
+  access* on 2026-11-06; the next run pushed clean to both registries. The
+  package had been created by `crunchtools/josui` at 57c8e37, when this image
+  was that repo's `Containerfile.dev`, and was still linked there, so this
+  repo's token was granted nothing on it. RT#1556
+
+### Changed
+
+- **`permissions.defaultMode` is not used, and is not shipped.** It was added to
+  one seat on gloval to make Remote Control sessions start in
+  `bypassPermissions`. Scott tested write and delete from his phone in all three
+  seats on 2026-11-06 and all three worked unprompted, while only that one seat
+  carried the setting — so `JOSUI_PERMISSION_MODE` in the unit environment,
+  which reaches each spawned child as `--permission-mode bypassPermissions`, is
+  what carries it, and the claude.ai app does not override it per session. The
+  setting was removed from that seat rather than rolled into this image: two
+  mechanisms for one behaviour is how a later change breaks something nobody
+  can explain. RT#1556
+
 ## [1.2.1] - 2026-11-06
 
 ### Fixed

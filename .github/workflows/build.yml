@@ -176,22 +176,13 @@ jobs:
     runs-on: ubuntu-latest
     if: github.event_name != 'pull_request'
     timeout-minutes: 30
-    # Best effort, on purpose -- but NOT for the reason first written here.
-    # ghcr.io/crunchtools/developer DOES exist and is publicly readable. It was
-    # created by crunchtools/josui at 57c8e37 ("publish the development image
-    # as `developer`, not `josui-dev`"), back when this image was that repo's
-    # Containerfile.dev, and the package is still linked to that repository.
-    # GITHUB_TOKEN here is scoped to crunchtools/developer, which the package
-    # grants nothing, so the push ends in "denied: permission_denied:
-    # write_package". Creating a package would not fix it; granting this repo
-    # write access on the existing package will (its settings -> Manage Actions
-    # access -> add crunchtools/developer, Write), as would relinking it.
-    #
-    # Until then: Quay is what production pulls, and a default branch left red
-    # over a mirror teaches the fleet's red-branch alert to be ignored, which
-    # costs more than the mirror is worth. Drop this line once the grant
-    # exists. RT#1556
-    continue-on-error: true
+    # ghcr.io/crunchtools/developer was created by crunchtools/josui at 57c8e37,
+    # when this image was that repo's Containerfile.dev, and the package is
+    # still linked there -- so this repo's GITHUB_TOKEN was granted nothing on
+    # it and every push ended in "denied: permission_denied: write_package".
+    # Scott added crunchtools/developer to the package's Manage Actions access
+    # on 2026-11-06 and the next run pushed clean, so the continue-on-error
+    # guard that kept the default branch green is gone. RT#1556
     permissions:
       contents: read
       packages: write
