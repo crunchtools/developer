@@ -64,7 +64,21 @@ if [ -n "$git_url" ] && [ -n "${TRENTINA_MCP_TOKEN:-}" ]; then
 fi
 # Skills are a git checkout on a volume. A failed pull is not fatal: the
 # checkout that is there still works, and the network may be the thing down.
+#
+# The seat runs the default branch, whatever the volume was seeded with. A
+# volume left on a feature branch pulled that branch's upstream on every
+# start, which never moved, so a seat ran weeks-old skills while every pull
+# reported success. Moving fails safely on local changes it would overwrite,
+# and says so.
 if [ -d "$skills_repo/.git" ]; then
+  # origin/HEAD is recorded at clone time; ask the remote what it is now.
+  git -C "$skills_repo" remote set-head origin --auto >/dev/null 2>&1 || true
+  default=$(git -C "$skills_repo" symbolic-ref --quiet --short refs/remotes/origin/HEAD 2>/dev/null) &&
+    default=${default#origin/} || default=main
+  if [ "$(git -C "$skills_repo" branch --show-current)" != "$default" ]; then
+    git -C "$skills_repo" checkout --quiet "$default" ||
+      log "skills checkout is not on $default and could not be moved there"
+  fi
   git -C "$skills_repo" pull --ff-only --quiet || log "skills pull failed, using the checkout as it is"
 fi
 find "$claude_dir/skills" -mindepth 1 -maxdepth 1 -type l -delete
