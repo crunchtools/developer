@@ -18,29 +18,39 @@ All notable changes to this project are documented here. The format follows
   `TRENTINA_MCP_URL` and is not settable on its own: this file carries the
   gateway token, so anything able to set the URL independently could redirect
   that token. Gatehouse's own review of the change raised that, correctly.
-  The file is written after
-  `install_mcp_env`, so a `gatehouse.env` still sitting in the mount is
-  overwritten rather than obeyed — the cutover is one-way and the rollback is
-  an image tag. A seat with no gateway token leaves the mounted file alone,
-  because failing there would take away the only Gatehouse it can run.
+  A `gatehouse.env` in the mount **wins**, and
+  the entrypoint writes nothing when one is there, so deploying this image
+  changes nothing by itself. Deleting the mounted key is the cutover, per
+  seat; re-placing it is the rollback. A seat with no gateway token or no
+  gateway URL also leaves the mount alone, because failing there would take
+  away the only Gatehouse it can run.
 
-### Removed
+### Deprecated
 
-- **The mounted OpenRouter API key.** It was a second, spendable copy of a
-  credential the gateway already held, with no per-seat accounting and no
+- **The mounted OpenRouter API key.** It is a second, spendable copy of a
+  credential the gateway already holds, with no per-seat accounting and no
   revocation short of editing files on gloval. Its *route* was never outside
-  the gateway — `openrouter.ai` was on the profile's egress allowlist and the
-  CONNECT proxy carried the traffic — but the key was, and that grant came off
-  the allowlist with it. Layer 5 names one credential again. RT#1559
+  the gateway — `openrouter.ai` is on the profile's egress allowlist and the
+  CONNECT proxy carries the traffic — but the key is. This release makes the
+  gateway route available; removing the key is an operator step, taken once
+  every repo a seat pushes is pinned to python-sdlc v0.5.2 or later, and the
+  `openrouter.ai` egress grant comes off with it. RT#1559
 
-### Requires
+  **The floor is per pushed repo, not per image.** A seat's gate runs
+  Gatehouse out of the python-sdlc image at the rev the *pushed repo* pins, so
+  this image cannot raise that floor for anything but itself. At the time of
+  writing `trentina`, `josui` and `acquacotta` pin v0.5.1, `rotv` v0.5.0 and
+  `claude-agent` v0.3.6 — all baking Gatehouse below 0.24.0. Deleting the key
+  before those move would turn their push gates into 401s.
 
-- **Gatehouse 0.24.0**, through the pinned `python-sdlc` rev. 0.23.0 and
-  earlier ignore `GATEHOUSE_LLM_BASE_URL` and would send the gateway token to
-  openrouter.ai as an OpenRouter key — a 401 on every push gate. The rev in
-  `.pre-commit-config.yaml` and the entrypoint move together, and the plain
-  `http` base URL needs 0.24.0's rule that a private address is as acceptable
-  as loopback (crunchtools/gatehouse#115).
+- **The pinned `python-sdlc` rev moves to v0.5.2**, which bakes Gatehouse
+  0.24.0. That is a requirement of the change above, not housekeeping: 0.23.0
+  and earlier ignore `GATEHOUSE_LLM_BASE_URL` and would send the gateway token
+  to openrouter.ai as an OpenRouter key — a 401 on every push gate on every
+  seat. 0.24.0 is also where a plaintext base URL to a private address became
+  acceptable, which this route needs because the gateway has no TLS listener
+  on the container bridge (crunchtools/gatehouse#115). The rev and the
+  entrypoint function move together.
 
 ### Verified
 

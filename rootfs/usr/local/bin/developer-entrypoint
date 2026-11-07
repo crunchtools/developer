@@ -255,16 +255,26 @@ install_mcp_env() {
 # Plain http to a private address, on purpose: the gateway has no TLS listener
 # on the container bridge, and Gatehouse accepts http for a loopback or
 # private host, where the key does not cross a network this host does not
-# control. That needs Gatehouse 0.24.0. 0.23.0 and earlier ignore
-# GATEHOUSE_LLM_BASE_URL entirely and would send the gateway token to
-# openrouter.ai as an OpenRouter key, which is a 401 on every push gate. The
-# pinned python-sdlc rev fixes the Gatehouse a seat runs, so that rev in
-# .pre-commit-config.yaml and this function move together.
+# control.
 #
-# Written AFTER install_mcp_env on purpose: this file is authoritative, and a
-# gatehouse.env still sitting in the mount is overwritten rather than obeyed.
-# That makes the cutover one-way and the rollback an image tag, not a scramble
-# to re-place a secret. Removing the mounted file is cleanup, not a cutover.
+# That needs Gatehouse 0.24.0, which is the floor for this whole route.
+# 0.23.0 and earlier ignore GATEHOUSE_LLM_BASE_URL entirely and would send the
+# gateway token to openrouter.ai as an OpenRouter key: a 401, and a gate that
+# fails rather than one that could not run, which is worse. Gatehouse is baked
+# into the python-sdlc image at a pin the PUSHED repo chooses, so this image
+# cannot establish that floor for anything but itself.
+#
+# A gatehouse.env in the mount WINS, and this writes nothing when one is
+# there. That is the opposite of what it did when first written, and the
+# reason is the Gatehouse floor below: a seat pushes many repos, and each one
+# pins its OWN python-sdlc rev, so the Gatehouse a gate runs is the pushed
+# repo's choice and not this image's. While any repo a seat pushes is still
+# pinned below python-sdlc v0.5.2, flipping this file breaks that repo's gate.
+#
+# So deleting the mounted key is the cutover, per seat, under an operator's
+# hand -- and re-placing it is the rollback. Deploying this image changes
+# nothing by itself, which is what makes it safe to deploy before the fleet
+# has caught up.
 #
 # `provider: {"zdr": true, "data_collection": "deny"}` rides in Gatehouse's
 # request body because the reviewed diff is private code. `provider` is an
@@ -289,11 +299,14 @@ install_gatehouse_env() {
     log "no gateway token or URL; gatehouse.env left as mounted"
     return 0
   fi
+  if [ -f "$file" ]; then
+    # Loud, because a key left here keeps a seat off the gateway route
+    # indefinitely and nothing else would say so.
+    log "gatehouse.env came from the mount; NOT using the gateway route (RT#1559)"
+    return 0
+  fi
   mkdir -p "$dest"
   chmod 0700 "$dest"
-  if [ -f "$file" ]; then
-    log "overwriting the mounted gatehouse.env: the gateway route is authoritative"
-  fi
   # umask, not a chmod after the fact: the token must never exist in a
   # world-readable file, not even for an instant.
   ( umask 0177 && cat > "$file" <<ENVEOF

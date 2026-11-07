@@ -354,16 +354,24 @@ class EntrypointTest(unittest.TestCase):
         # exists in a seat any more (RT#1559).
         self.assertIn("OPENROUTER_API_KEY=s3cret-token\n", body)
 
-    def test_a_mounted_gatehouse_env_is_overwritten_not_obeyed(self) -> None:
+    def test_a_mounted_gatehouse_env_wins(self) -> None:
+        """Deleting the mounted key is the cutover, so a present one wins.
+
+        A seat pushes many repos and each pins its own python-sdlc rev, so the
+        Gatehouse a gate runs is the pushed repo's choice. Flipping this file
+        while any such repo is below v0.5.2 breaks that repo's gate, so the
+        image must not flip it on its own.
+        """
         src = self.config / "mcp-env"
         src.mkdir()
         (src / "gatehouse.env").write_text("OPENROUTER_API_KEY=sk-raw-key-from-the-mount\n")
         result = self.run_entrypoint()
         self.assertEqual(result.returncode, 0, result.stderr)
-        body = (self.home / ".config/mcp-env/gatehouse.env").read_text()
-        self.assertNotIn("sk-raw-key-from-the-mount", body)
-        self.assertIn("OPENROUTER_API_KEY=s3cret-token\n", body)
-        self.assertIn("the gateway route is authoritative", result.stderr)
+        self.assertEqual(
+            (self.home / ".config/mcp-env/gatehouse.env").read_text(),
+            "OPENROUTER_API_KEY=sk-raw-key-from-the-mount\n",
+        )
+        self.assertIn("NOT using the gateway route", result.stderr)
 
     def test_no_gateway_token_leaves_the_mounted_gatehouse_env_alone(self) -> None:
         src = self.config / "mcp-env"
