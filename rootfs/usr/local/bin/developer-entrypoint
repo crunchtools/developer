@@ -247,8 +247,16 @@ install_mcp_env() {
 # already holds, with no per-seat accounting and no revocation short of editing
 # files on the host (RT#1559).
 #
-# The gateway serves the same provider at /proxy/llm/openrouter with the seat's
-# own token, so that is what this writes. Gatehouse appends
+# The gateway serves OpenRouter twice, under two names, and this takes the one
+# that is Gatehouse's alone. `llm_keys` is both the L3 defense judge's
+# credential and what the proxy injects, so a single provider put judging and
+# Gatehouse on one key and made per-function spend unreadable; the
+# openrouter-gatehouse route carries its own key and the judge keeps
+# `openrouter`. Pointing this at `openrouter` still works and is the wrong
+# thing: it bills Gatehouse to whatever this profile judges with.
+#
+# The gateway serves it with the seat's own token, so that is what this
+# writes. Gatehouse appends
 # /chat/completions to the base URL, and the gateway's openrouter upstream is
 # https://openrouter.ai/api, so the base URL carries the /v1 between them.
 #
@@ -296,7 +304,7 @@ install_gatehouse_env() {
     # carries the gateway token, so anything able to set the URL
     # independently could redirect that token to an endpoint of its choosing.
     # Gatehouse's own review of this change raised exactly that, correctly.
-    url="${TRENTINA_MCP_URL%%/gateway/*}/proxy/llm/openrouter/v1"
+    url="${TRENTINA_MCP_URL%%/gateway/*}/proxy/llm/openrouter-gatehouse/v1"
   fi
   if [ -z "${gateway_token:-}" ] || [ -z "$url" ]; then
     # No gateway identity: leave whatever the mount provided. A seat without a

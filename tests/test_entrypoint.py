@@ -350,7 +350,9 @@ class EntrypointTest(unittest.TestCase):
         body = written.read_text()
         # The origin comes from TRENTINA_MCP_URL and only the path differs, so a
         # gateway that moves does not need this file edited too.
-        self.assertIn("GATEHOUSE_LLM_BASE_URL=http://192.0.2.2:8019/proxy/llm/openrouter/v1\n", body)
+        self.assertIn(
+            "GATEHOUSE_LLM_BASE_URL=http://192.0.2.2:8019/proxy/llm/openrouter-gatehouse/v1\n", body
+        )
         # The seat's own gateway token is the key: no OpenRouter credential
         # exists in a seat any more (RT#1559).
         self.assertIn("OPENROUTER_API_KEY=s3cret-token\n", body)
@@ -465,7 +467,9 @@ class EntrypointTest(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stderr)
         body = (self.home / ".config/mcp-env/gatehouse.env").read_text()
         self.assertNotIn("192.0.2.9", body)
-        self.assertIn("GATEHOUSE_LLM_BASE_URL=http://192.0.2.2:8019/proxy/llm/openrouter/v1\n", body)
+        self.assertIn(
+            "GATEHOUSE_LLM_BASE_URL=http://192.0.2.2:8019/proxy/llm/openrouter-gatehouse/v1\n", body
+        )
 
     def test_a_token_with_no_gateway_url_leaves_the_mount_alone(self) -> None:
         src = self.config / "mcp-env"

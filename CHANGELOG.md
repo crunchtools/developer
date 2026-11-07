@@ -6,6 +6,20 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [1.5.0] - 2026-11-07
+
+### Changed
+
+- **Gatehouse gets its own LLM endpoint on the gateway**, not the one the L3
+  defense judge uses. `GATEHOUSE_LLM_BASE_URL` now derives
+  `/proxy/llm/openrouter-gatehouse/v1`. The gateway serves OpenRouter twice
+  under two names, because `llm_keys` is *both* the judge's credential
+  (resolved by `defense.provider`) and what the proxy injects on
+  `/proxy/llm/<name>` — so one provider forced judging and Gatehouse onto one
+  key and made per-function spend unreadable. Two names, two keys, one
+  upstream, and all Gatehouse usage lands on the Gatehouse key wherever it
+  runs: seats, breetai, CI and Ashigaru. RT#1559
+
 ## [1.4.0] - 2026-11-07
 
 ### Changed
