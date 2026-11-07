@@ -6,6 +6,17 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Fixed
+
+- **A seat runs the skills repository's default branch, whatever its volume
+  was seeded with.** The entrypoint pulled whichever branch the checkout was
+  on. A volume left on a feature branch therefore pulled that branch's upstream
+  on every start, which never moved, and reported success: developer1 ran
+  skills three weeks and 91 commits behind `main`, and `/feature` still sent
+  deploys to lotor. It now refreshes `origin/HEAD`, moves to that branch, and
+  then pulls. A move that would overwrite local changes is refused and logged,
+  and the checkout keeps working as it is.
+
 ## [1.4.0] - 2026-11-07
 
 ### Changed

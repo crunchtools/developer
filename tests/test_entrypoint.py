@@ -146,6 +146,38 @@ class EntrypointTest(unittest.TestCase):
         self.run_entrypoint()
         self.assertEqual([p.name for p in (self.home / ".claude/skills").iterdir()], ["alpha"])
 
+    def _git(self, cwd: Path, *args: str) -> str:
+        identity = ("-c", "user.name=t", "-c", "user.email=t@example.com")
+        done = subprocess.run(
+            ["git", *identity, *args], cwd=cwd, env=self.env, capture_output=True, text=True, check=True
+        )
+        return done.stdout.strip()
+
+    def test_a_skills_checkout_on_a_feature_branch_is_moved_to_main(self) -> None:
+        """A volume seeded on a feature branch never saw main again: every
+        start pulled the branch's upstream, which did not move, and said so
+        quietly. The seat ran three-week-old skills."""
+        upstream = self.root / "upstream"
+        (upstream / "skills/alpha").mkdir(parents=True)
+        (upstream / "skills/alpha/SKILL.md").write_text("alpha\n")
+        self._git(upstream, "init", "-q", "-b", "main")
+        self._git(upstream, "add", "-A")
+        self._git(upstream, "commit", "-qm", "alpha")
+        self._git(upstream, "checkout", "-qb", "fix/old")
+        self._git(upstream, "commit", "-qm", "old fix", "--allow-empty")
+        shutil.rmtree(self.skills)
+        self._git(self.root, "clone", "-q", "-b", "fix/old", str(upstream), str(self.skills))
+        self._git(upstream, "checkout", "-q", "main")
+        (upstream / "skills/gamma").mkdir()
+        (upstream / "skills/gamma/SKILL.md").write_text("gamma\n")
+        self._git(upstream, "add", "-A")
+        self._git(upstream, "commit", "-qm", "gamma")
+
+        self.run_entrypoint()
+
+        self.assertEqual(self._git(self.skills, "branch", "--show-current"), "main")
+        self.assertTrue((self.home / ".claude/skills/gamma").exists())
+
     def test_arguments_run_instead_of_remote_control(self) -> None:
         result = self.run_entrypoint("claude", "auth", "login")
         self.assertEqual(result.returncode, 0, result.stderr)
