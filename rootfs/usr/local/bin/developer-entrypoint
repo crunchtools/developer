@@ -122,6 +122,12 @@ else
   log "TRENTINA_MCP_URL / TRENTINA_MCP_TOKEN not set, starting without a gateway"
 fi
 
+# Kept for install_gatehouse_env, which runs after install_mcp_env and so
+# cannot read the variable this line removes. The token is already on disk in
+# the state file written just above, at 0600, so holding it in one more 0600
+# file adds no exposure the seat did not already have. The `unset` stands:
+# nothing the agent starts inherits it.
+gateway_token=${TRENTINA_MCP_TOKEN:-}
 unset TRENTINA_MCP_TOKEN
 
 # The text session, when a homeserver is configured: claude-agent run holds an
@@ -233,8 +239,132 @@ install_mcp_env() {
   log "installed $found env file(s) from $src"
 }
 
+# Gatehouse through the gateway, not straight to OpenRouter.
+#
+# Gatehouse reads ~/.config/mcp-env/gatehouse.env and needs an LLM. Pointed at
+# openrouter.ai it needs an OpenRouter key of its own, and that key was mounted
+# into every seat -- a second, spendable copy of a credential the gateway
+# already holds, with no per-seat accounting and no revocation short of editing
+# files on the host (RT#1559).
+#
+# The gateway serves the same provider at /proxy/llm/openrouter with the seat's
+# own token, so that is what this writes. Gatehouse appends
+# /chat/completions to the base URL, and the gateway's openrouter upstream is
+# https://openrouter.ai/api, so the base URL carries the /v1 between them.
+#
+# Plain http to a private address, on purpose: the gateway has no TLS listener
+# on the container bridge, and Gatehouse accepts http for a loopback or
+# private host, where the key does not cross a network this host does not
+# control.
+#
+# That needs Gatehouse 0.24.0, which is the floor for this whole route.
+# 0.23.0 and earlier ignore GATEHOUSE_LLM_BASE_URL entirely and would send the
+# gateway token to openrouter.ai as an OpenRouter key: a 401, and a gate that
+# fails rather than one that could not run, which is worse. Gatehouse is baked
+# into the python-sdlc image at a pin the PUSHED repo chooses, so this image
+# cannot establish that floor for anything but itself.
+#
+# A gatehouse.env in the mount WINS, and this writes nothing when one is
+# there. That is the opposite of what it did when first written, and the
+# reason is the Gatehouse floor below: a seat pushes many repos, and each one
+# pins its OWN python-sdlc rev, so the Gatehouse a gate runs is the pushed
+# repo's choice and not this image's. While any repo a seat pushes is still
+# pinned below python-sdlc v0.5.2, flipping this file breaks that repo's gate.
+#
+# So deleting the mounted key is the cutover, per seat, under an operator's
+# hand -- and re-placing it is the rollback. Deploying this image changes
+# nothing by itself, which is what makes it safe to deploy before the fleet
+# has caught up.
+#
+# `provider: {"zdr": true, "data_collection": "deny"}` rides in Gatehouse's
+# request body because the reviewed diff is private code. `provider` is an
+# allowed key on the gateway's OpenRouter shape and the body is forwarded
+# verbatim, so the guarantee survives the move -- verified 2026-11-07 against
+# the live gateway, which returned 200 rather than refusing it as an unknown
+# parameter. If that shape ever narrows, this route stops being safe to use.
+install_gatehouse_env() {
+  local dest="$HOME/.config/mcp-env" file="$HOME/.config/mcp-env/gatehouse.env"
+  # The MOUNT decides, never the destination. $HOME is a persistent volume, so
+  # a gatehouse.env in $dest may be one THIS function wrote at a previous
+  # start -- and testing the destination would then read its own output as an
+  # operator's choice, leave a rotated token stale, and log the wrong reason.
+  # Gatehouse's review of the first version of this caught exactly that.
+  local mounted="$config_dir/mcp-env/gatehouse.env"
+  local url=""
+  if [ -n "${TRENTINA_MCP_URL:-}" ]; then
+    # Derived from the MCP endpoint, never settable on its own. This file
+    # carries the gateway token, so anything able to set the URL
+    # independently could redirect that token to an endpoint of its choosing.
+    # Gatehouse's own review of this change raised exactly that, correctly.
+    url="${TRENTINA_MCP_URL%%/gateway/*}/proxy/llm/openrouter/v1"
+  fi
+  if [ -z "${gateway_token:-}" ] || [ -z "$url" ]; then
+    # No gateway identity: leave whatever the mount provided. A seat without a
+    # token cannot use the gateway route at all, and failing here would take
+    # away the only Gatehouse this seat can run.
+    log "no gateway token or URL; gatehouse.env left as mounted"
+    return 0
+  fi
+  if [ -f "$mounted" ]; then
+    # Loud, because a key left in the mount keeps a seat off the gateway route
+    # indefinitely and nothing else would say so.
+    log "gatehouse.env is mounted; NOT using the gateway route (RT#1559)"
+    return 0
+  fi
+  # $HOME is a persistent volume the agent can write, so no component of this
+  # path may be followed if it is a symlink: `mkdir -p` follows a symlinked
+  # ancestor, and a write through it would put the gateway token under
+  # whatever it pointed at and clobber what was there. Every component is
+  # checked and created one at a time rather than with `mkdir -p`, because
+  # checking only the last one leaves $HOME/.config as the way in. Gatehouse's
+  # review found first the file, then the directory, then the ancestor.
+  #
+  # This is hygiene, not a boundary, and it is worth being clear about which:
+  # anything that can plant a symlink here runs as this user, and this user's
+  # Claude Code state file already holds the same gateway token at 0600. What
+  # the check buys is that a seat cannot be made to overwrite an arbitrary
+  # file, and that a swapped path is refused rather than followed. A
+  # check-then-create in shell still has a window between the two; closing
+  # that needs openat(O_NOFOLLOW) and a program that is not this one.
+  local dir="$HOME" part
+  for part in .config mcp-env; do
+    dir="$dir/$part"
+    if [ -L "$dir" ]; then
+      log "$dir is a symlink; refusing to write a token through it"
+      return 0
+    fi
+    if [ ! -d "$dir" ] && ! mkdir -m 0700 "$dir"; then
+      log "cannot create $dir; gatehouse.env not written"
+      return 0
+    fi
+  done
+  chmod 0700 "$dest"
+  # Written to a fresh file and renamed over the destination. rename(2)
+  # replaces a symlink AT the destination rather than following it, and it is
+  # atomic, so a gate reading this file concurrently sees one version or the
+  # other and never a half-written one. mktemp creates at 0600 whatever the
+  # umask is, which is the other half of the token never being readable.
+  local tmp
+  tmp=$(mktemp "$dest/.gatehouse.env.XXXXXX") || {
+    log "cannot create a temporary file in $dest; gatehouse.env not written"
+    return 0
+  }
+  # Rewritten at every start, replacing whatever a previous start left: the
+  # seat token rotates, and a stale one is a gate that fails rather than one
+  # that could not run.
+  cat > "$tmp" <<ENVEOF
+# Written by developer-entrypoint at container start. Do not edit: it is
+# replaced on every start. See RT#1559.
+GATEHOUSE_LLM_BASE_URL=$url
+OPENROUTER_API_KEY=$gateway_token
+ENVEOF
+  mv -f "$tmp" "$file"
+  log "gatehouse.env points at the gateway: $url"
+}
+
 set_git_identity
 install_mcp_env
+install_gatehouse_env
 
 cd "$workdir"
 # Remote Control redraws a terminal status screen on stdout every second.

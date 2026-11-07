@@ -17,7 +17,7 @@ rather than waiting for CI to render them.
 | state | `/home/podman` | Claude login, sessions, clones, caches. The only writable home. |
 | containers | `/home/podman/.local/share/containers` | The nested engine's storage. A **cache** — exclude it from backups. |
 | identity | `/etc/josui` (read-only) | `CLAUDE.md`, `settings.json`. Says what this agent is and what it is not. |
-| tool keys | `/etc/josui/mcp-env` (read-only) | `*.env` for the gates that take an API key. Installed to `~/.config/mcp-env` at 0600. Absent, the gates that need one say so. |
+| tool keys | `/etc/josui/mcp-env` (read-only) | `*.env` for a gate that takes an API key. Installed to `~/.config/mcp-env` at 0600. No gate needs one today: Gatehouse goes through the gateway. A `gatehouse.env` placed here is overwritten by the entrypoint, not obeyed. |
 | skills | `/var/lib/josui/josui-skills` | A git checkout, pulled at start. |
 | audit | `/var/log/josui` | One JSON line per tool call, plus Remote Control's debug file. |
 
@@ -72,7 +72,7 @@ and each is now either done by the entrypoint or a documented step:
 | Need | Where it comes from |
 |------|---------------------|
 | a git identity | `JOSUI_GIT_NAME` and `JOSUI_GIT_EMAIL`, set by the entrypoint only if nothing is configured already |
-| Gatehouse's API key | an `*.env` file in the `/etc/josui/mcp-env` mount |
+| Gatehouse's LLM | the entrypoint writes `~/.config/mcp-env/gatehouse.env` pointing at the gateway's `/proxy/llm/openrouter/v1` route, with this seat's `TRENTINA_MCP_TOKEN` as the key. No OpenRouter key lives in a seat (RT#1559) |
 | loopback out of the proxy | `NO_PROXY` must list `127.0.0.1,localhost,::1`. podman passes `HTTP(S)_PROXY` into every nested gate container by default, so without it a test talking to its own local server is tunnelled to the gateway and refused |
 | the constitution checkout | `sdlc`'s validator runs in the gate container with `HOME=/tmp`, so the gateway's `insteadOf` rewrite does not apply and its plain clone of `crunchtools/constitution` is refused by the egress proxy. Seed it once per inherited version, through the route that does work: `git clone --depth 1 -b <tag> https://github.com/crunchtools/constitution "$(podman volume inspect crunchtools-hook-cache --format '{{.Mountpoint}}')/constitution/<tag>"` |
 

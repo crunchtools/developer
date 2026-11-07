@@ -1,6 +1,6 @@
 # developer Constitution
 
-> **Version:** 1.3.0
+> **Version:** 1.4.0
 > **Ratified:** 2026-11-06
 > **Status:** Active
 > **Inherits:** [crunchtools/constitution](https://github.com/crunchtools/constitution) v1.31.0
@@ -121,15 +121,42 @@ from the `--debug-file`, not inferred.
 
 ## Layer 5 — Credential & Identity Management
 
-The agent holds two credentials. The gateway's bearer token, from the env
-file, is the one that matters: it is what the gateway identifies this seat by.
-The second is an API key for a gate that reviews code with an LLM —
-Gatehouse's, in `~/.config/mcp-env/gatehouse.env` — which arrives through a
-read-only mount at `/etc/josui/mcp-env`, never in the image and never in the
-environment, where `envscrub` would scrub it and the gate would then die
-reporting that it could not run. It buys nothing but reviews: it reaches one
-host already on this profile's egress allowlist and grants nothing on this
-host or in the fleet.
+The agent needs one credential: the gateway's bearer token, from the env file.
+It is what the gateway identifies this seat by.
+
+A second one is on its way out — an OpenRouter API key for
+Gatehouse, the gate that reviews code with an LLM, mounted at
+`/etc/josui/mcp-env` because `envscrub` would strip it from the environment
+and the gate would then die reporting that it could not run.
+`developer-entrypoint` writes `~/.config/mcp-env/gatehouse.env` itself when
+the mount provides none, pointing Gatehouse at the gateway's
+`/proxy/llm/openrouter` route with this seat's own token as the key. The URL
+is derived from `TRENTINA_MCP_URL` and is not settable on its own, because
+anything able to set it could redirect the token that file carries.
+
+A mounted `gatehouse.env` wins, so deleting it is the cutover and re-placing
+it is the rollback. That is deliberate and not a convenience: a seat pushes
+many repos, each pins its own python-sdlc rev, and the Gatehouse a gate runs
+is the PUSHED repo's choice. This image cannot raise that floor for anything
+but itself, and Gatehouse below 0.24.0 ignores `GATEHOUSE_LLM_BASE_URL` and
+would send the gateway token to openrouter.ai as an OpenRouter key. A seat
+with no gateway token or URL also leaves the mount alone, because failing
+there would take away the only Gatehouse such a seat could run.
+
+Removing the mounted key removes the one credential that lives outside the
+gateway. Its route never was — `openrouter.ai` is on this profile's egress
+allowlist and the proxy carries the traffic — but the key is a second,
+spendable copy of one the gateway already holds, with no per-seat accounting
+and no revocation short of editing files on the host. The `openrouter.ai`
+grant comes off this profile's allowlist with it, and until both happen Layer
+5 names two credentials rather than one (RT#1559).
+
+Gatehouse sends `provider: {"zdr": true, "data_collection": "deny"}` on every
+request, because the diff it reviews is private code. Through the gateway that
+guarantee is the gateway's to keep: `provider` is an allowed key on its
+OpenRouter shape and the request body is forwarded verbatim. If that shape
+narrows, this route stops being safe to use.
+
 Everything else is the gateway's — the GitHub token on its git route and in its
 GitHub tools, the LLM key for judging. The Claude login is personal, lives in
 the state volume, and is established once, interactively, per container;
@@ -192,6 +219,7 @@ crunchtools/nagios-agent compares the two containers' start times and says so.
 
 | Version | Date | Changes |
 |---------|------|---------|
+| 1.4.0 | 2026-11-07 | The gateway's `/proxy/llm/openrouter` route on the seat's own token is available to Gatehouse: the entrypoint writes that `gatehouse.env` when the mount provides none. A mounted key still wins, so deleting it is the cutover and the image deploys inert -- the Gatehouse floor is set by the PUSHED repo's python-sdlc pin, which this image cannot raise. Verified end to end on developer3 with Gatehouse 0.24.0. RT#1559 |
 | 1.3.0 | 2026-11-06 | The GHCR mirror pushes once the package grants this repo access, so the continue-on-error guard comes off; `permissions.defaultMode` measured redundant against the unit's `JOSUI_PERMISSION_MODE` and not shipped. RT#1556 |
 | 1.2.1 | 2026-11-06 | The GHCR mirror's failure explained correctly: the package exists and is linked to crunchtools/josui, so the fix is a grant, not a creation. RT#1556 |
 | 1.2.0 | 2026-11-06 | `sdlc` on PATH, resolving the rev the repo pins rather than any default, so a gate run by hand is the same tool CI runs. RT#1556 |

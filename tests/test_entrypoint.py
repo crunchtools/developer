@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import json
 import os
+import pathlib
 import shutil
 import stat
 import subprocess
@@ -325,23 +326,164 @@ class EntrypointTest(unittest.TestCase):
     def test_mounted_env_files_are_installed_private(self) -> None:
         src = self.config / "mcp-env"
         src.mkdir()
-        key = src / "gatehouse.env"
-        key.write_text("OPENROUTER_API_KEY=sk-test\n")
+        key = src / "other.env"
+        key.write_text("SOME_API_KEY=sk-test\n")
         key.chmod(0o644)
         (src / "notes.txt").write_text("not an env file\n")
         result = self.run_entrypoint()
         self.assertEqual(result.returncode, 0, result.stderr)
         dest = self.home / ".config/mcp-env"
         self.assertEqual(stat.S_IMODE(dest.stat().st_mode), 0o700)
-        installed = dest / "gatehouse.env"
+        installed = dest / "other.env"
         self.assertEqual(stat.S_IMODE(installed.stat().st_mode), 0o600)
-        self.assertEqual(installed.read_text(), "OPENROUTER_API_KEY=sk-test\n")
+        self.assertEqual(installed.read_text(), "SOME_API_KEY=sk-test\n")
         # Only *.env is taken, so a README beside the keys is not copied in.
         self.assertFalse((dest / "notes.txt").exists())
 
-    def test_no_env_dir_means_nothing_happens(self) -> None:
+    def test_gatehouse_env_points_at_the_gateway(self) -> None:
+        result = self.run_entrypoint()
+        self.assertEqual(result.returncode, 0, result.stderr)
+        dest = self.home / ".config/mcp-env"
+        self.assertEqual(stat.S_IMODE(dest.stat().st_mode), 0o700)
+        written = dest / "gatehouse.env"
+        self.assertEqual(stat.S_IMODE(written.stat().st_mode), 0o600)
+        body = written.read_text()
+        # The origin comes from TRENTINA_MCP_URL and only the path differs, so a
+        # gateway that moves does not need this file edited too.
+        self.assertIn("GATEHOUSE_LLM_BASE_URL=http://192.0.2.2:8019/proxy/llm/openrouter/v1\n", body)
+        # The seat's own gateway token is the key: no OpenRouter credential
+        # exists in a seat any more (RT#1559).
+        self.assertIn("OPENROUTER_API_KEY=s3cret-token\n", body)
+
+    def test_a_mounted_gatehouse_env_wins(self) -> None:
+        """Deleting the mounted key is the cutover, so a present one wins.
+
+        A seat pushes many repos and each pins its own python-sdlc rev, so the
+        Gatehouse a gate runs is the pushed repo's choice. Flipping this file
+        while any such repo is below v0.5.2 breaks that repo's gate, so the
+        image must not flip it on its own.
+        """
+        src = self.config / "mcp-env"
+        src.mkdir()
+        (src / "gatehouse.env").write_text("OPENROUTER_API_KEY=sk-raw-key-from-the-mount\n")
+        result = self.run_entrypoint()
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(
+            (self.home / ".config/mcp-env/gatehouse.env").read_text(),
+            "OPENROUTER_API_KEY=sk-raw-key-from-the-mount\n",
+        )
+        self.assertIn("NOT using the gateway route", result.stderr)
+
+    def test_a_generated_gatehouse_env_is_refreshed_not_mistaken_for_a_mount(self) -> None:
+        """$HOME persists, so a file this wrote last start is not a mount.
+
+        Testing the destination would read its own output as an operator's
+        choice and leave a rotated token stale.
+        """
         self.assertEqual(self.run_entrypoint().returncode, 0)
-        self.assertFalse((self.home / ".config/mcp-env").exists())
+        env = {**self.env, "TRENTINA_MCP_TOKEN": "rotated-token"}
+        result = self.run_entrypoint(env=env)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        body = (self.home / ".config/mcp-env/gatehouse.env").read_text()
+        self.assertIn("OPENROUTER_API_KEY=rotated-token\n", body)
+        self.assertNotIn("s3cret-token", body)
+        self.assertNotIn("NOT using the gateway route", result.stderr)
+
+    def test_a_planted_symlink_does_not_capture_the_token(self) -> None:
+        """$HOME is agent-writable, so the destination may be a trap."""
+        dest = self.home / ".config/mcp-env"
+        dest.mkdir(parents=True)
+        target = self.home / "stolen.env"
+        target.write_text("untouched\n")
+        (dest / "gatehouse.env").symlink_to(target)
+        result = self.run_entrypoint()
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(target.read_text(), "untouched\n")
+        written = dest / "gatehouse.env"
+        self.assertFalse(written.is_symlink())
+        self.assertIn("OPENROUTER_API_KEY=s3cret-token\n", written.read_text())
+        self.assertEqual(stat.S_IMODE(written.stat().st_mode), 0o600)
+
+    def test_a_symlinked_config_dir_is_refused(self) -> None:
+        elsewhere = self.home / "elsewhere"
+        elsewhere.mkdir()
+        (self.home / ".config").mkdir()
+        (self.home / ".config/mcp-env").symlink_to(elsewhere)
+        result = self.run_entrypoint()
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(list(elsewhere.iterdir()), [])
+        self.assertIn("refusing to write a token through it", result.stderr)
+
+    def test_a_symlinked_ancestor_is_refused(self) -> None:
+        """Checking only the last component leaves ~/.config as the way in."""
+        elsewhere = self.home / "elsewhere"
+        elsewhere.mkdir()
+        (self.home / ".config").symlink_to(elsewhere)
+        result = self.run_entrypoint()
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertFalse((elsewhere / "mcp-env").exists())
+        self.assertIn(".config is a symlink", result.stderr)
+
+    def test_mktemp_failing_writes_no_token(self) -> None:
+        fake = pathlib.Path(self.env["PATH"].split(os.pathsep)[0]) / "mktemp"
+        fake.write_text(
+            "#!/bin/bash\n"
+            # Only the gatehouse.env template: the state file above needs a
+            # working mktemp to get that far.
+            'case "$1" in *gatehouse.env*) exit 1 ;; esac\n'
+            'exec /usr/bin/mktemp "$@"\n'
+        )
+        fake.chmod(0o755)
+        result = self.run_entrypoint()
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertFalse((self.home / ".config/mcp-env/gatehouse.env").exists())
+        self.assertIn("cannot create a temporary file", result.stderr)
+
+    def test_no_temporary_file_is_left_behind(self) -> None:
+        self.assertEqual(self.run_entrypoint().returncode, 0)
+        names = sorted(p.name for p in (self.home / ".config/mcp-env").iterdir())
+        self.assertEqual(names, ["gatehouse.env"])
+
+    def test_no_gateway_token_leaves_the_mounted_gatehouse_env_alone(self) -> None:
+        src = self.config / "mcp-env"
+        src.mkdir()
+        (src / "gatehouse.env").write_text("OPENROUTER_API_KEY=sk-raw\n")
+        env = {k: v for k, v in self.env.items() if k != "TRENTINA_MCP_TOKEN"}
+        result = self.run_entrypoint(env=env)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        # Failing here would take away the only Gatehouse such a seat can run.
+        self.assertEqual(
+            (self.home / ".config/mcp-env/gatehouse.env").read_text(),
+            "OPENROUTER_API_KEY=sk-raw\n",
+        )
+        self.assertIn("left as mounted", result.stderr)
+
+    def test_the_url_is_not_settable_on_its_own(self) -> None:
+        """Anything able to set it could redirect the gateway token."""
+        env = {**self.env, "TRENTINA_LLM_URL": "http://192.0.2.9:9000/collect"}
+        result = self.run_entrypoint(env=env)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        body = (self.home / ".config/mcp-env/gatehouse.env").read_text()
+        self.assertNotIn("192.0.2.9", body)
+        self.assertIn("GATEHOUSE_LLM_BASE_URL=http://192.0.2.2:8019/proxy/llm/openrouter/v1\n", body)
+
+    def test_a_token_with_no_gateway_url_leaves_the_mount_alone(self) -> None:
+        src = self.config / "mcp-env"
+        src.mkdir()
+        (src / "gatehouse.env").write_text("OPENROUTER_API_KEY=sk-raw\n")
+        env = {k: v for k, v in self.env.items() if k != "TRENTINA_MCP_URL"}
+        result = self.run_entrypoint(env=env)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(
+            (self.home / ".config/mcp-env/gatehouse.env").read_text(),
+            "OPENROUTER_API_KEY=sk-raw\n",
+        )
+        self.assertIn("left as mounted", result.stderr)
+
+    def test_no_env_dir_still_writes_the_gateway_gatehouse_env(self) -> None:
+        self.assertEqual(self.run_entrypoint().returncode, 0)
+        dest = self.home / ".config/mcp-env"
+        self.assertEqual(sorted(p.name for p in dest.iterdir()), ["gatehouse.env"])
 
     def test_an_empty_env_dir_is_reported_not_fatal(self) -> None:
         (self.config / "mcp-env").mkdir()

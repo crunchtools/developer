@@ -6,6 +6,63 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [1.4.0] - 2026-11-07
+
+### Changed
+
+- **Gatehouse reviews through the gateway, not straight to OpenRouter.**
+  `developer-entrypoint` now writes `~/.config/mcp-env/gatehouse.env` itself,
+  setting `GATEHOUSE_LLM_BASE_URL` to the gateway's
+  `/proxy/llm/openrouter/v1` route and using the seat's own
+  `TRENTINA_MCP_TOKEN` as the key. The URL's origin is derived from
+  `TRENTINA_MCP_URL` and is not settable on its own: this file carries the
+  gateway token, so anything able to set the URL independently could redirect
+  that token. Gatehouse's own review of the change raised that, correctly.
+  A `gatehouse.env` in the mount **wins**, and
+  the entrypoint writes nothing when one is there, so deploying this image
+  changes nothing by itself. Deleting the mounted key is the cutover, per
+  seat; re-placing it is the rollback. A seat with no gateway token or no
+  gateway URL also leaves the mount alone, because failing there would take
+  away the only Gatehouse it can run.
+
+### Deprecated
+
+- **The mounted OpenRouter API key.** It is a second, spendable copy of a
+  credential the gateway already holds, with no per-seat accounting and no
+  revocation short of editing files on gloval. Its *route* was never outside
+  the gateway — `openrouter.ai` is on the profile's egress allowlist and the
+  CONNECT proxy carries the traffic — but the key is. This release makes the
+  gateway route available; removing the key is an operator step, taken once
+  every repo a seat pushes is pinned to python-sdlc v0.5.2 or later, and the
+  `openrouter.ai` egress grant comes off with it. RT#1559
+
+  **The floor is per pushed repo, not per image.** A seat's gate runs
+  Gatehouse out of the python-sdlc image at the rev the *pushed repo* pins, so
+  this image cannot raise that floor for anything but itself. At the time of
+  writing `trentina`, `josui` and `acquacotta` pin v0.5.1, `rotv` v0.5.0 and
+  `claude-agent` v0.3.6 — all baking Gatehouse below 0.24.0. Deleting the key
+  before those move would turn their push gates into 401s.
+
+- **The pinned `python-sdlc` rev moves to v0.5.2**, which bakes Gatehouse
+  0.24.0. That is a requirement of the change above, not housekeeping: 0.23.0
+  and earlier ignore `GATEHOUSE_LLM_BASE_URL` and would send the gateway token
+  to openrouter.ai as an OpenRouter key — a 401 on every push gate on every
+  seat. 0.24.0 is also where a plaintext base URL to a private address became
+  acceptable, which this route needs because the gateway has no TLS listener
+  on the container bridge (crunchtools/gatehouse#115). The rev and the
+  entrypoint function move together.
+
+### Verified
+
+- The gateway's LLM route answers from both the seat and the nested gate
+  container that actually runs Gatehouse (`podman run` inside the seat
+  inherits the seat's proxy environment and empty `resolv.conf`, so it is
+  fenced the same way). Gatehouse's
+  `provider: {"zdr": true, "data_collection": "deny"}` is an allowed key on
+  the gateway's OpenRouter shape and the body is forwarded verbatim, so the
+  zero-retention guarantee survives the move — the gateway returned 200 rather
+  than refusing it as an unknown parameter.
+
 ## [1.3.0] - 2026-11-06
 
 ### Fixed
