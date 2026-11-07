@@ -1,6 +1,6 @@
 # developer Constitution
 
-> **Version:** 1.3.0
+> **Version:** 1.4.0
 > **Ratified:** 2026-11-06
 > **Status:** Active
 > **Inherits:** [crunchtools/constitution](https://github.com/crunchtools/constitution) v1.31.0
@@ -121,15 +121,33 @@ from the `--debug-file`, not inferred.
 
 ## Layer 5 — Credential & Identity Management
 
-The agent holds two credentials. The gateway's bearer token, from the env
-file, is the one that matters: it is what the gateway identifies this seat by.
-The second is an API key for a gate that reviews code with an LLM —
-Gatehouse's, in `~/.config/mcp-env/gatehouse.env` — which arrives through a
-read-only mount at `/etc/josui/mcp-env`, never in the image and never in the
-environment, where `envscrub` would scrub it and the gate would then die
-reporting that it could not run. It buys nothing but reviews: it reaches one
-host already on this profile's egress allowlist and grants nothing on this
-host or in the fleet.
+The agent holds one credential: the gateway's bearer token, from the env file.
+It is what the gateway identifies this seat by, and it is the only secret a
+seat needs.
+
+There is no second credential. There was one — an OpenRouter API key for
+Gatehouse, the gate that reviews code with an LLM, mounted at
+`/etc/josui/mcp-env` because `envscrub` would strip it from the environment
+and the gate would then die reporting that it could not run. It is gone.
+`developer-entrypoint` now writes `~/.config/mcp-env/gatehouse.env` itself,
+pointing Gatehouse at the gateway's `/proxy/llm/openrouter` route with this
+seat's own token as the key, and overwriting anything the mount provides. A
+seat with no gateway token leaves a mounted file alone, because failing there
+would take away the only Gatehouse such a seat could run.
+
+That removes the one credential that lived outside the gateway. Its route was
+never outside — `openrouter.ai` was on this profile's egress allowlist and the
+proxy carried the traffic — but the key was a second, spendable copy of one the
+gateway already held, with no per-seat accounting and no revocation short of
+editing files on the host. The grant for `openrouter.ai` came off this
+profile's allowlist with it (RT#1559).
+
+Gatehouse sends `provider: {"zdr": true, "data_collection": "deny"}` on every
+request, because the diff it reviews is private code. Through the gateway that
+guarantee is the gateway's to keep: `provider` is an allowed key on its
+OpenRouter shape and the request body is forwarded verbatim. If that shape
+narrows, this route stops being safe to use.
+
 Everything else is the gateway's — the GitHub token on its git route and in its
 GitHub tools, the LLM key for judging. The Claude login is personal, lives in
 the state volume, and is established once, interactively, per container;
@@ -192,6 +210,7 @@ crunchtools/nagios-agent compares the two containers' start times and says so.
 
 | Version | Date | Changes |
 |---------|------|---------|
+| 1.4.0 | 2026-11-07 | Gatehouse goes through the gateway's `/proxy/llm/openrouter` route on the seat's own token, so the mounted OpenRouter key is gone and Layer 5 names one credential again. The `openrouter.ai` egress grant came off the profile with it. Verified end to end on developer3. RT#1559 |
 | 1.3.0 | 2026-11-06 | The GHCR mirror pushes once the package grants this repo access, so the continue-on-error guard comes off; `permissions.defaultMode` measured redundant against the unit's `JOSUI_PERMISSION_MODE` and not shipped. RT#1556 |
 | 1.2.1 | 2026-11-06 | The GHCR mirror's failure explained correctly: the package exists and is linked to crunchtools/josui, so the fix is a grant, not a creation. RT#1556 |
 | 1.2.0 | 2026-11-06 | `sdlc` on PATH, resolving the rev the repo pins rather than any default, so a gate run by hand is the same tool CI runs. RT#1556 |

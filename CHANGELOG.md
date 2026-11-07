@@ -6,6 +6,42 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [1.4.0] - 2026-11-07
+
+### Changed
+
+- **Gatehouse reviews through the gateway, not straight to OpenRouter.**
+  `developer-entrypoint` now writes `~/.config/mcp-env/gatehouse.env` itself,
+  setting `GATEHOUSE_LLM_BASE_URL` to the gateway's
+  `/proxy/llm/openrouter/v1` route and using the seat's own
+  `TRENTINA_MCP_TOKEN` as the key. The URL's origin is derived from
+  `TRENTINA_MCP_URL`, so a gateway that moves needs nothing edited here;
+  `TRENTINA_LLM_URL` overrides it. The file is written after
+  `install_mcp_env`, so a `gatehouse.env` still sitting in the mount is
+  overwritten rather than obeyed — the cutover is one-way and the rollback is
+  an image tag. A seat with no gateway token leaves the mounted file alone,
+  because failing there would take away the only Gatehouse it can run.
+
+### Removed
+
+- **The mounted OpenRouter API key.** It was a second, spendable copy of a
+  credential the gateway already held, with no per-seat accounting and no
+  revocation short of editing files on gloval. Its *route* was never outside
+  the gateway — `openrouter.ai` was on the profile's egress allowlist and the
+  CONNECT proxy carried the traffic — but the key was, and that grant came off
+  the allowlist with it. Layer 5 names one credential again. RT#1559
+
+### Verified
+
+- The gateway's LLM route answers from both the seat and the nested gate
+  container that actually runs Gatehouse (`podman run` inside the seat
+  inherits the seat's proxy environment and empty `resolv.conf`, so it is
+  fenced the same way). Gatehouse's
+  `provider: {"zdr": true, "data_collection": "deny"}` is an allowed key on
+  the gateway's OpenRouter shape and the body is forwarded verbatim, so the
+  zero-retention guarantee survives the move — the gateway returned 200 rather
+  than refusing it as an unknown parameter.
+
 ## [1.3.0] - 2026-11-06
 
 ### Fixed

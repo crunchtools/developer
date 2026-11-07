@@ -122,6 +122,12 @@ else
   log "TRENTINA_MCP_URL / TRENTINA_MCP_TOKEN not set, starting without a gateway"
 fi
 
+# Kept for install_gatehouse_env, which runs after install_mcp_env and so
+# cannot read the variable this line removes. The token is already on disk in
+# the state file written just above, at 0600, so holding it in one more 0600
+# file adds no exposure the seat did not already have. The `unset` stands:
+# nothing the agent starts inherits it.
+gateway_token=${TRENTINA_MCP_TOKEN:-}
 unset TRENTINA_MCP_TOKEN
 
 # The text session, when a homeserver is configured: claude-agent run holds an
@@ -233,8 +239,64 @@ install_mcp_env() {
   log "installed $found env file(s) from $src"
 }
 
+# Gatehouse through the gateway, not straight to OpenRouter.
+#
+# Gatehouse reads ~/.config/mcp-env/gatehouse.env and needs an LLM. Pointed at
+# openrouter.ai it needs an OpenRouter key of its own, and that key was mounted
+# into every seat -- a second, spendable copy of a credential the gateway
+# already holds, with no per-seat accounting and no revocation short of editing
+# files on the host (RT#1559).
+#
+# The gateway serves the same provider at /proxy/llm/openrouter with the seat's
+# own token, so that is what this writes. Gatehouse appends
+# /chat/completions to the base URL, and the gateway's openrouter upstream is
+# https://openrouter.ai/api, so the base URL carries the /v1 between them.
+#
+# Written AFTER install_mcp_env on purpose: this file is authoritative, and a
+# gatehouse.env still sitting in the mount is overwritten rather than obeyed.
+# That makes the cutover one-way and the rollback an image tag, not a scramble
+# to re-place a secret. Removing the mounted file is cleanup, not a cutover.
+#
+# `provider: {"zdr": true, "data_collection": "deny"}` rides in Gatehouse's
+# request body because the reviewed diff is private code. `provider` is an
+# allowed key on the gateway's OpenRouter shape and the body is forwarded
+# verbatim, so the guarantee survives the move -- verified 2026-11-07 against
+# the live gateway, which returned 200 rather than refusing it as an unknown
+# parameter. If that shape ever narrows, this route stops being safe to use.
+install_gatehouse_env() {
+  local dest="$HOME/.config/mcp-env" file="$HOME/.config/mcp-env/gatehouse.env"
+  local url=${TRENTINA_LLM_URL:-}
+  if [ -z "$url" ] && [ -n "${TRENTINA_MCP_URL:-}" ]; then
+    # Same origin as the MCP endpoint; only the path differs.
+    url="${TRENTINA_MCP_URL%%/gateway/*}/proxy/llm/openrouter/v1"
+  fi
+  if [ -z "${gateway_token:-}" ] || [ -z "$url" ]; then
+    # No gateway identity: leave whatever the mount provided. A seat without a
+    # token cannot use the gateway route at all, and failing here would take
+    # away the only Gatehouse this seat can run.
+    log "no gateway token or URL; gatehouse.env left as mounted"
+    return 0
+  fi
+  mkdir -p "$dest"
+  chmod 0700 "$dest"
+  if [ -f "$file" ]; then
+    log "overwriting the mounted gatehouse.env: the gateway route is authoritative"
+  fi
+  # umask, not a chmod after the fact: the token must never exist in a
+  # world-readable file, not even for an instant.
+  ( umask 0177 && cat > "$file" <<ENVEOF
+# Written by developer-entrypoint at container start. Do not edit: it is
+# replaced on every start. See RT#1559.
+GATEHOUSE_LLM_BASE_URL=$url
+OPENROUTER_API_KEY=$gateway_token
+ENVEOF
+  )
+  log "gatehouse.env points at the gateway: $url"
+}
+
 set_git_identity
 install_mcp_env
+install_gatehouse_env
 
 cd "$workdir"
 # Remote Control redraws a terminal status screen on stdout every second.

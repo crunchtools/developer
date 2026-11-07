@@ -325,23 +325,73 @@ class EntrypointTest(unittest.TestCase):
     def test_mounted_env_files_are_installed_private(self) -> None:
         src = self.config / "mcp-env"
         src.mkdir()
-        key = src / "gatehouse.env"
-        key.write_text("OPENROUTER_API_KEY=sk-test\n")
+        key = src / "other.env"
+        key.write_text("SOME_API_KEY=sk-test\n")
         key.chmod(0o644)
         (src / "notes.txt").write_text("not an env file\n")
         result = self.run_entrypoint()
         self.assertEqual(result.returncode, 0, result.stderr)
         dest = self.home / ".config/mcp-env"
         self.assertEqual(stat.S_IMODE(dest.stat().st_mode), 0o700)
-        installed = dest / "gatehouse.env"
+        installed = dest / "other.env"
         self.assertEqual(stat.S_IMODE(installed.stat().st_mode), 0o600)
-        self.assertEqual(installed.read_text(), "OPENROUTER_API_KEY=sk-test\n")
+        self.assertEqual(installed.read_text(), "SOME_API_KEY=sk-test\n")
         # Only *.env is taken, so a README beside the keys is not copied in.
         self.assertFalse((dest / "notes.txt").exists())
 
-    def test_no_env_dir_means_nothing_happens(self) -> None:
+    def test_gatehouse_env_points_at_the_gateway(self) -> None:
+        result = self.run_entrypoint()
+        self.assertEqual(result.returncode, 0, result.stderr)
+        dest = self.home / ".config/mcp-env"
+        self.assertEqual(stat.S_IMODE(dest.stat().st_mode), 0o700)
+        written = dest / "gatehouse.env"
+        self.assertEqual(stat.S_IMODE(written.stat().st_mode), 0o600)
+        body = written.read_text()
+        # The origin comes from TRENTINA_MCP_URL and only the path differs, so a
+        # gateway that moves does not need this file edited too.
+        self.assertIn("GATEHOUSE_LLM_BASE_URL=http://192.0.2.2:8019/proxy/llm/openrouter/v1\n", body)
+        # The seat's own gateway token is the key: no OpenRouter credential
+        # exists in a seat any more (RT#1559).
+        self.assertIn("OPENROUTER_API_KEY=s3cret-token\n", body)
+
+    def test_a_mounted_gatehouse_env_is_overwritten_not_obeyed(self) -> None:
+        src = self.config / "mcp-env"
+        src.mkdir()
+        (src / "gatehouse.env").write_text("OPENROUTER_API_KEY=sk-raw-key-from-the-mount\n")
+        result = self.run_entrypoint()
+        self.assertEqual(result.returncode, 0, result.stderr)
+        body = (self.home / ".config/mcp-env/gatehouse.env").read_text()
+        self.assertNotIn("sk-raw-key-from-the-mount", body)
+        self.assertIn("OPENROUTER_API_KEY=s3cret-token\n", body)
+        self.assertIn("the gateway route is authoritative", result.stderr)
+
+    def test_no_gateway_token_leaves_the_mounted_gatehouse_env_alone(self) -> None:
+        src = self.config / "mcp-env"
+        src.mkdir()
+        (src / "gatehouse.env").write_text("OPENROUTER_API_KEY=sk-raw\n")
+        env = {k: v for k, v in self.env.items() if k != "TRENTINA_MCP_TOKEN"}
+        result = self.run_entrypoint(env=env)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        # Failing here would take away the only Gatehouse such a seat can run.
+        self.assertEqual(
+            (self.home / ".config/mcp-env/gatehouse.env").read_text(),
+            "OPENROUTER_API_KEY=sk-raw\n",
+        )
+        self.assertIn("left as mounted", result.stderr)
+
+    def test_an_explicit_llm_url_wins_over_the_derived_one(self) -> None:
+        env = {**self.env, "TRENTINA_LLM_URL": "http://192.0.2.9:9000/proxy/llm/openrouter/v1"}
+        result = self.run_entrypoint(env=env)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn(
+            "GATEHOUSE_LLM_BASE_URL=http://192.0.2.9:9000/proxy/llm/openrouter/v1\n",
+            (self.home / ".config/mcp-env/gatehouse.env").read_text(),
+        )
+
+    def test_no_env_dir_still_writes_the_gateway_gatehouse_env(self) -> None:
         self.assertEqual(self.run_entrypoint().returncode, 0)
-        self.assertFalse((self.home / ".config/mcp-env").exists())
+        dest = self.home / ".config/mcp-env"
+        self.assertEqual(sorted(p.name for p in dest.iterdir()), ["gatehouse.env"])
 
     def test_an_empty_env_dir_is_reported_not_fatal(self) -> None:
         (self.config / "mcp-env").mkdir()
