@@ -373,6 +373,21 @@ class EntrypointTest(unittest.TestCase):
         )
         self.assertIn("NOT using the gateway route", result.stderr)
 
+    def test_a_generated_gatehouse_env_is_refreshed_not_mistaken_for_a_mount(self) -> None:
+        """$HOME persists, so a file this wrote last start is not a mount.
+
+        Testing the destination would read its own output as an operator's
+        choice and leave a rotated token stale.
+        """
+        self.assertEqual(self.run_entrypoint().returncode, 0)
+        env = {**self.env, "TRENTINA_MCP_TOKEN": "rotated-token"}
+        result = self.run_entrypoint(env=env)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        body = (self.home / ".config/mcp-env/gatehouse.env").read_text()
+        self.assertIn("OPENROUTER_API_KEY=rotated-token\n", body)
+        self.assertNotIn("s3cret-token", body)
+        self.assertNotIn("NOT using the gateway route", result.stderr)
+
     def test_no_gateway_token_leaves_the_mounted_gatehouse_env_alone(self) -> None:
         src = self.config / "mcp-env"
         src.mkdir()

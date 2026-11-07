@@ -284,6 +284,12 @@ install_mcp_env() {
 # parameter. If that shape ever narrows, this route stops being safe to use.
 install_gatehouse_env() {
   local dest="$HOME/.config/mcp-env" file="$HOME/.config/mcp-env/gatehouse.env"
+  # The MOUNT decides, never the destination. $HOME is a persistent volume, so
+  # a gatehouse.env in $dest may be one THIS function wrote at a previous
+  # start -- and testing the destination would then read its own output as an
+  # operator's choice, leave a rotated token stale, and log the wrong reason.
+  # Gatehouse's review of the first version of this caught exactly that.
+  local mounted="$config_dir/mcp-env/gatehouse.env"
   local url=""
   if [ -n "${TRENTINA_MCP_URL:-}" ]; then
     # Derived from the MCP endpoint, never settable on its own. This file
@@ -299,14 +305,18 @@ install_gatehouse_env() {
     log "no gateway token or URL; gatehouse.env left as mounted"
     return 0
   fi
-  if [ -f "$file" ]; then
-    # Loud, because a key left here keeps a seat off the gateway route
+  if [ -f "$mounted" ]; then
+    # Loud, because a key left in the mount keeps a seat off the gateway route
     # indefinitely and nothing else would say so.
-    log "gatehouse.env came from the mount; NOT using the gateway route (RT#1559)"
+    log "gatehouse.env is mounted; NOT using the gateway route (RT#1559)"
     return 0
   fi
   mkdir -p "$dest"
   chmod 0700 "$dest"
+  # Rewritten at every start, overwriting whatever a previous start left: the
+  # seat token rotates, and a stale one is a gate that fails rather than one
+  # that could not run.
+  #
   # umask, not a chmod after the fact: the token must never exist in a
   # world-readable file, not even for an instant.
   ( umask 0177 && cat > "$file" <<ENVEOF
