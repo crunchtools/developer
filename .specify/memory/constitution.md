@@ -226,7 +226,7 @@ crunchtools/nagios-agent compares the two containers' start times and says so.
 
 | Version | Date | Changes |
 |---------|------|---------|
-| 1.5.0 | 2026-11-07 | Gatehouse calls `/proxy/llm/openrouter-gatehouse/v1`, a second gateway route to the same upstream carrying its own key, so a seat has two token endpoints: one the L3 judge spends on and one Gatehouse does. All Gatehouse usage then lands on one key fleet-wide. RT#1559 |
+| 1.5.0 | 2026-11-07 | Gatehouse calls `/proxy/llm/openrouter-gatehouse/v1`, a second gateway route to the same upstream carrying its own key, so a seat has two token endpoints: one the L3 judge spends on and one Gatehouse does. All Gatehouse usage then lands on one key fleet-wide (RT#1559). Also ships #12: a seat tracks the skills repository's default branch rather than whatever its volume was seeded with |
 | 1.4.0 | 2026-11-07 | The gateway's `/proxy/llm/openrouter` route on the seat's own token is available to Gatehouse: the entrypoint writes that `gatehouse.env` when the mount provides none. A mounted key still wins, so deleting it is the cutover and the image deploys inert -- the Gatehouse floor is set by the PUSHED repo's python-sdlc pin, which this image cannot raise. Verified end to end on developer3 with Gatehouse 0.24.0. RT#1559 |
 | 1.3.0 | 2026-11-06 | The GHCR mirror pushes once the package grants this repo access, so the continue-on-error guard comes off; `permissions.defaultMode` measured redundant against the unit's `JOSUI_PERMISSION_MODE` and not shipped. RT#1556 |
 | 1.2.1 | 2026-11-06 | The GHCR mirror's failure explained correctly: the package exists and is linked to crunchtools/josui, so the fix is a grant, not a creation. RT#1556 |
