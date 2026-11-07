@@ -388,6 +388,36 @@ class EntrypointTest(unittest.TestCase):
         self.assertNotIn("s3cret-token", body)
         self.assertNotIn("NOT using the gateway route", result.stderr)
 
+    def test_a_planted_symlink_does_not_capture_the_token(self) -> None:
+        """$HOME is agent-writable, so the destination may be a trap."""
+        dest = self.home / ".config/mcp-env"
+        dest.mkdir(parents=True)
+        target = self.home / "stolen.env"
+        target.write_text("untouched\n")
+        (dest / "gatehouse.env").symlink_to(target)
+        result = self.run_entrypoint()
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(target.read_text(), "untouched\n")
+        written = dest / "gatehouse.env"
+        self.assertFalse(written.is_symlink())
+        self.assertIn("OPENROUTER_API_KEY=s3cret-token\n", written.read_text())
+        self.assertEqual(stat.S_IMODE(written.stat().st_mode), 0o600)
+
+    def test_a_symlinked_config_dir_is_refused(self) -> None:
+        elsewhere = self.home / "elsewhere"
+        elsewhere.mkdir()
+        (self.home / ".config").mkdir()
+        (self.home / ".config/mcp-env").symlink_to(elsewhere)
+        result = self.run_entrypoint()
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(list(elsewhere.iterdir()), [])
+        self.assertIn("refusing to write a token through it", result.stderr)
+
+    def test_no_temporary_file_is_left_behind(self) -> None:
+        self.assertEqual(self.run_entrypoint().returncode, 0)
+        names = sorted(p.name for p in (self.home / ".config/mcp-env").iterdir())
+        self.assertEqual(names, ["gatehouse.env"])
+
     def test_no_gateway_token_leaves_the_mounted_gatehouse_env_alone(self) -> None:
         src = self.config / "mcp-env"
         src.mkdir()

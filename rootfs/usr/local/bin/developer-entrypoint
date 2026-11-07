@@ -311,21 +311,36 @@ install_gatehouse_env() {
     log "gatehouse.env is mounted; NOT using the gateway route (RT#1559)"
     return 0
   fi
+  # $HOME is a persistent volume the agent can write, so neither the directory
+  # nor the file may be followed if it is a symlink: `cat > "$file"` would
+  # write the gateway token wherever it pointed, and clobber whatever was
+  # there. Gatehouse's review of the previous commit caught this one too.
+  if [ -L "$dest" ]; then
+    log "$dest is a symlink; refusing to write a token through it"
+    return 0
+  fi
   mkdir -p "$dest"
   chmod 0700 "$dest"
-  # Rewritten at every start, overwriting whatever a previous start left: the
+  # Written to a fresh file and renamed over the destination. rename(2)
+  # replaces a symlink AT the destination rather than following it, and it is
+  # atomic, so a gate reading this file concurrently sees one version or the
+  # other and never a half-written one. mktemp creates at 0600 whatever the
+  # umask is, which is the other half of the token never being readable.
+  local tmp
+  tmp=$(mktemp "$dest/.gatehouse.env.XXXXXX") || {
+    log "cannot create a temporary file in $dest; gatehouse.env not written"
+    return 0
+  }
+  # Rewritten at every start, replacing whatever a previous start left: the
   # seat token rotates, and a stale one is a gate that fails rather than one
   # that could not run.
-  #
-  # umask, not a chmod after the fact: the token must never exist in a
-  # world-readable file, not even for an instant.
-  ( umask 0177 && cat > "$file" <<ENVEOF
+  cat > "$tmp" <<ENVEOF
 # Written by developer-entrypoint at container start. Do not edit: it is
 # replaced on every start. See RT#1559.
 GATEHOUSE_LLM_BASE_URL=$url
 OPENROUTER_API_KEY=$gateway_token
 ENVEOF
-  )
+  mv -f "$tmp" "$file"
   log "gatehouse.env points at the gateway: $url"
 }
 
