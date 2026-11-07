@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import json
 import os
+import pathlib
 import shutil
 import stat
 import subprocess
@@ -412,6 +413,31 @@ class EntrypointTest(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual(list(elsewhere.iterdir()), [])
         self.assertIn("refusing to write a token through it", result.stderr)
+
+    def test_a_symlinked_ancestor_is_refused(self) -> None:
+        """Checking only the last component leaves ~/.config as the way in."""
+        elsewhere = self.home / "elsewhere"
+        elsewhere.mkdir()
+        (self.home / ".config").symlink_to(elsewhere)
+        result = self.run_entrypoint()
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertFalse((elsewhere / "mcp-env").exists())
+        self.assertIn(".config is a symlink", result.stderr)
+
+    def test_mktemp_failing_writes_no_token(self) -> None:
+        fake = pathlib.Path(self.env["PATH"].split(os.pathsep)[0]) / "mktemp"
+        fake.write_text(
+            "#!/bin/bash\n"
+            # Only the gatehouse.env template: the state file above needs a
+            # working mktemp to get that far.
+            'case "$1" in *gatehouse.env*) exit 1 ;; esac\n'
+            'exec /usr/bin/mktemp "$@"\n'
+        )
+        fake.chmod(0o755)
+        result = self.run_entrypoint()
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertFalse((self.home / ".config/mcp-env/gatehouse.env").exists())
+        self.assertIn("cannot create a temporary file", result.stderr)
 
     def test_no_temporary_file_is_left_behind(self) -> None:
         self.assertEqual(self.run_entrypoint().returncode, 0)

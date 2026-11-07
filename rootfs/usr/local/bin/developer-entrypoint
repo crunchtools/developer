@@ -311,15 +311,33 @@ install_gatehouse_env() {
     log "gatehouse.env is mounted; NOT using the gateway route (RT#1559)"
     return 0
   fi
-  # $HOME is a persistent volume the agent can write, so neither the directory
-  # nor the file may be followed if it is a symlink: `cat > "$file"` would
-  # write the gateway token wherever it pointed, and clobber whatever was
-  # there. Gatehouse's review of the previous commit caught this one too.
-  if [ -L "$dest" ]; then
-    log "$dest is a symlink; refusing to write a token through it"
-    return 0
-  fi
-  mkdir -p "$dest"
+  # $HOME is a persistent volume the agent can write, so no component of this
+  # path may be followed if it is a symlink: `mkdir -p` follows a symlinked
+  # ancestor, and a write through it would put the gateway token under
+  # whatever it pointed at and clobber what was there. Every component is
+  # checked and created one at a time rather than with `mkdir -p`, because
+  # checking only the last one leaves $HOME/.config as the way in. Gatehouse's
+  # review found first the file, then the directory, then the ancestor.
+  #
+  # This is hygiene, not a boundary, and it is worth being clear about which:
+  # anything that can plant a symlink here runs as this user, and this user's
+  # Claude Code state file already holds the same gateway token at 0600. What
+  # the check buys is that a seat cannot be made to overwrite an arbitrary
+  # file, and that a swapped path is refused rather than followed. A
+  # check-then-create in shell still has a window between the two; closing
+  # that needs openat(O_NOFOLLOW) and a program that is not this one.
+  local dir="$HOME" part
+  for part in .config mcp-env; do
+    dir="$dir/$part"
+    if [ -L "$dir" ]; then
+      log "$dir is a symlink; refusing to write a token through it"
+      return 0
+    fi
+    if [ ! -d "$dir" ] && ! mkdir -m 0700 "$dir"; then
+      log "cannot create $dir; gatehouse.env not written"
+      return 0
+    fi
+  done
   chmod 0700 "$dest"
   # Written to a fresh file and renamed over the destination. rename(2)
   # replaces a symlink AT the destination rather than following it, and it is
