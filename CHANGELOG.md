@@ -15,8 +15,10 @@ All notable changes to this project are documented here. The format follows
   setting `GATEHOUSE_LLM_BASE_URL` to the gateway's
   `/proxy/llm/openrouter/v1` route and using the seat's own
   `TRENTINA_MCP_TOKEN` as the key. The URL's origin is derived from
-  `TRENTINA_MCP_URL`, so a gateway that moves needs nothing edited here;
-  `TRENTINA_LLM_URL` overrides it. The file is written after
+  `TRENTINA_MCP_URL` and is not settable on its own: this file carries the
+  gateway token, so anything able to set the URL independently could redirect
+  that token. Gatehouse's own review of the change raised that, correctly.
+  The file is written after
   `install_mcp_env`, so a `gatehouse.env` still sitting in the mount is
   overwritten rather than obeyed — the cutover is one-way and the rollback is
   an image tag. A seat with no gateway token leaves the mounted file alone,
@@ -30,6 +32,15 @@ All notable changes to this project are documented here. The format follows
   the gateway — `openrouter.ai` was on the profile's egress allowlist and the
   CONNECT proxy carried the traffic — but the key was, and that grant came off
   the allowlist with it. Layer 5 names one credential again. RT#1559
+
+### Requires
+
+- **Gatehouse 0.24.0**, through the pinned `python-sdlc` rev. 0.23.0 and
+  earlier ignore `GATEHOUSE_LLM_BASE_URL` and would send the gateway token to
+  openrouter.ai as an OpenRouter key — a 401 on every push gate. The rev in
+  `.pre-commit-config.yaml` and the entrypoint move together, and the plain
+  `http` base URL needs 0.24.0's rule that a private address is as acceptable
+  as loopback (crunchtools/gatehouse#115).
 
 ### Verified
 

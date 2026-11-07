@@ -252,6 +252,15 @@ install_mcp_env() {
 # /chat/completions to the base URL, and the gateway's openrouter upstream is
 # https://openrouter.ai/api, so the base URL carries the /v1 between them.
 #
+# Plain http to a private address, on purpose: the gateway has no TLS listener
+# on the container bridge, and Gatehouse accepts http for a loopback or
+# private host, where the key does not cross a network this host does not
+# control. That needs Gatehouse 0.24.0. 0.23.0 and earlier ignore
+# GATEHOUSE_LLM_BASE_URL entirely and would send the gateway token to
+# openrouter.ai as an OpenRouter key, which is a 401 on every push gate. The
+# pinned python-sdlc rev fixes the Gatehouse a seat runs, so that rev in
+# .pre-commit-config.yaml and this function move together.
+#
 # Written AFTER install_mcp_env on purpose: this file is authoritative, and a
 # gatehouse.env still sitting in the mount is overwritten rather than obeyed.
 # That makes the cutover one-way and the rollback an image tag, not a scramble
@@ -265,9 +274,12 @@ install_mcp_env() {
 # parameter. If that shape ever narrows, this route stops being safe to use.
 install_gatehouse_env() {
   local dest="$HOME/.config/mcp-env" file="$HOME/.config/mcp-env/gatehouse.env"
-  local url=${TRENTINA_LLM_URL:-}
-  if [ -z "$url" ] && [ -n "${TRENTINA_MCP_URL:-}" ]; then
-    # Same origin as the MCP endpoint; only the path differs.
+  local url=""
+  if [ -n "${TRENTINA_MCP_URL:-}" ]; then
+    # Derived from the MCP endpoint, never settable on its own. This file
+    # carries the gateway token, so anything able to set the URL
+    # independently could redirect that token to an endpoint of its choosing.
+    # Gatehouse's own review of this change raised exactly that, correctly.
     url="${TRENTINA_MCP_URL%%/gateway/*}/proxy/llm/openrouter/v1"
   fi
   if [ -z "${gateway_token:-}" ] || [ -z "$url" ]; then

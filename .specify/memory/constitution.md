@@ -131,7 +131,9 @@ Gatehouse, the gate that reviews code with an LLM, mounted at
 and the gate would then die reporting that it could not run. It is gone.
 `developer-entrypoint` now writes `~/.config/mcp-env/gatehouse.env` itself,
 pointing Gatehouse at the gateway's `/proxy/llm/openrouter` route with this
-seat's own token as the key, and overwriting anything the mount provides. A
+seat's own token as the key, and overwriting anything the mount provides. The
+URL is derived from `TRENTINA_MCP_URL` and is not settable on its own, because
+anything able to set it could redirect the token that file carries. A
 seat with no gateway token leaves a mounted file alone, because failing there
 would take away the only Gatehouse such a seat could run.
 

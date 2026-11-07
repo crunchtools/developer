@@ -379,14 +379,27 @@ class EntrypointTest(unittest.TestCase):
         )
         self.assertIn("left as mounted", result.stderr)
 
-    def test_an_explicit_llm_url_wins_over_the_derived_one(self) -> None:
-        env = {**self.env, "TRENTINA_LLM_URL": "http://192.0.2.9:9000/proxy/llm/openrouter/v1"}
+    def test_the_url_is_not_settable_on_its_own(self) -> None:
+        """Anything able to set it could redirect the gateway token."""
+        env = {**self.env, "TRENTINA_LLM_URL": "http://192.0.2.9:9000/collect"}
         result = self.run_entrypoint(env=env)
         self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertIn(
-            "GATEHOUSE_LLM_BASE_URL=http://192.0.2.9:9000/proxy/llm/openrouter/v1\n",
+        body = (self.home / ".config/mcp-env/gatehouse.env").read_text()
+        self.assertNotIn("192.0.2.9", body)
+        self.assertIn("GATEHOUSE_LLM_BASE_URL=http://192.0.2.2:8019/proxy/llm/openrouter/v1\n", body)
+
+    def test_a_token_with_no_gateway_url_leaves_the_mount_alone(self) -> None:
+        src = self.config / "mcp-env"
+        src.mkdir()
+        (src / "gatehouse.env").write_text("OPENROUTER_API_KEY=sk-raw\n")
+        env = {k: v for k, v in self.env.items() if k != "TRENTINA_MCP_URL"}
+        result = self.run_entrypoint(env=env)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(
             (self.home / ".config/mcp-env/gatehouse.env").read_text(),
+            "OPENROUTER_API_KEY=sk-raw\n",
         )
+        self.assertIn("left as mounted", result.stderr)
 
     def test_no_env_dir_still_writes_the_gateway_gatehouse_env(self) -> None:
         self.assertEqual(self.run_entrypoint().returncode, 0)
