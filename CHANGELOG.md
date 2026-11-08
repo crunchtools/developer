@@ -6,6 +6,8 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [1.5.1] - 2026-11-08
+
 ### Fixed
 
 - The image carries a `version` label (1.5.0). The release sweep moves the

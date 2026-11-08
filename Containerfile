@@ -56,7 +56,7 @@
 FROM quay.io/podman/stable@sha256:f7a17ef911a2b9b866ada8a9426a07e29a6e4f8109ef8c0e0b7010c2541b4e49
 
 LABEL maintainer="fatherlinux <scott.mccarty@crunchtools.com>"
-LABEL version="1.5.0"
+LABEL version="1.5.1"
 LABEL description="developer - a crunchtools development agent: Claude Code with a toolchain and nested podman"
 
 # The same versions the production image runs. A new Claude Code or
