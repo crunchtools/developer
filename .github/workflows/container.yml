@@ -1,0 +1,55 @@
+name: Container
+
+# The development agent image: developer1-3 on gloval, the agents that BUILD
+# the fleet. Build once per change, gate the pushed digest, promote what was
+# tested (constitution container-image VII). Trivy runs on the gated digest
+# inside the release workflow.
+#
+# `parent-image-updated` is load-bearing: the base is pinned by digest and
+# Trivy cannot see Fedora packages, so the `dnf -y upgrade` in the
+# Containerfile, run by that weekly pulse, is the only thing that moves the OS
+# layer forward. No schedule and no tag release (constitution): the image
+# tracks main, and units pull :main.
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  repository_dispatch:
+    types: [parent-image-updated]
+  workflow_dispatch:
+
+permissions: {}
+
+jobs:
+  container:
+    uses: crunchtools/constitution/.github/workflows/container-release.yml@v1.39.1
+    permissions:
+      contents: read
+      pull-requests: read
+    with:
+      image: quay.io/crunchtools/developer
+      boot: command
+      boot-timeout: 600
+      # Every tool an agent in the image needs answers. The entrypoint is
+      # bypassed (it needs the Josui mounts); the nested engine is not run
+      # (a property of the host, settled on gloval, RT#1556).
+      boot-command: |
+        podman run --rm --entrypoint /bin/bash \
+          --device /dev/fuse --security-opt label=disable \
+          "$IMAGE" -c '
+          set -euxo pipefail
+          claude --version
+          claude-agent --version
+          python3 -c "import sys; assert sys.version_info[:2] >= (3, 14), sys.version"
+          uv --version
+          tmux -V
+          git --version
+          node --version
+          pre-commit --version
+          podman --version
+          bash -n /usr/local/bin/developer-entrypoint
+        '
+    secrets:
+      QUAY_USERNAME: ${{ secrets.QUAY_USERNAME }}
+      QUAY_PASSWORD: ${{ secrets.QUAY_PASSWORD }}
