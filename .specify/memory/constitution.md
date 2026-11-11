@@ -3,7 +3,7 @@
 > **Version:** 1.5.0
 > **Ratified:** 2026-11-06
 > **Status:** Active
-> **Inherits:** [crunchtools/constitution](https://github.com/crunchtools/constitution) v1.31.0
+> **Inherits:** [crunchtools/constitution](https://github.com/crunchtools/constitution) v1.39.1
 > **Profile:** Autonomous Agent
 
 Claude Code packaged as a container for agents that **build** the crunchtools
@@ -70,7 +70,7 @@ start, replacing whatever was there.
 
 ## Layer 3 — Container & Supply Chain Security
 
-- **Image:** `quay.io/crunchtools/developer` and `ghcr.io/crunchtools/developer`,
+- **Image:** `quay.io/crunchtools/developer` (Quay.io is the only registry),
   public. Tooling only; identity and credentials are mounted.
 - **Base:** `quay.io/podman/stable`, pinned by digest, the same digest
   gha-runner runs. **Not UBI**: UBI 10 fails a nested `podman run` with "mount

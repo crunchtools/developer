@@ -51,7 +51,7 @@
 # it is why this is a separate image with its own Trentina profile rather than
 # a flag on the production one.
 #
-# Build happens in GitHub Actions (.github/workflows/build.yml).
+# Build happens in GitHub Actions (.github/workflows/container.yml).
 
 FROM quay.io/podman/stable@sha256:f7a17ef911a2b9b866ada8a9426a07e29a6e4f8109ef8c0e0b7010c2541b4e49
 
