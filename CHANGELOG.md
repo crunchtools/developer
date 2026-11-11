@@ -6,6 +6,8 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [1.6.0] - 2026-11-11
+
 ### Changed
 
 - Builds move to constitution v1.39.1's container-release workflow: build once, gate the pushed digest (the toolchain check, run with podman against the digest), promote by digest. `:latest` now moves on a `v*` tag only. GHCR is dropped; Quay.io is the only registry. RT#1550
