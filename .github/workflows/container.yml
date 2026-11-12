@@ -29,6 +29,9 @@ jobs:
       pull-requests: read
     with:
       image: quay.io/crunchtools/developer
+      # No tag releases (constitution), so :latest follows the gated :main
+      # instead of freezing on the last pre-build-once image (RT#1550).
+      cascade: true
       boot: command
       boot-timeout: 600
       # Every tool an agent in the image needs answers. The entrypoint is
