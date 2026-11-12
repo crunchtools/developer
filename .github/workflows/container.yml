@@ -2,11 +2,11 @@ name: Container
 
 # The development agent image: developer1-3 on gloval, the agents that BUILD
 # the fleet. Build once per change, gate the pushed digest, promote what was
-# tested (constitution container-image VII). Trivy runs on the gated digest
-# inside the release workflow.
+# tested (constitution container-image VII). Published images are scanned on
+# a schedule by the fleet CVE check (RT #1551), not in this build.
 #
-# `parent-image-updated` is load-bearing: the base is pinned by digest and
-# Trivy cannot see Fedora packages, so the `dnf -y upgrade` in the
+# `parent-image-updated` is load-bearing: the base is pinned by digest, so
+# the `dnf -y upgrade` in the
 # Containerfile, run by that weekly pulse, is the only thing that moves the OS
 # layer forward. No schedule and no tag release (constitution): the image
 # tracks main, and units pull :main.
