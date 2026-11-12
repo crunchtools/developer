@@ -6,6 +6,8 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [1.6.0] - 2026-11-12
+
 ### Fixed
 
 - `:latest` follows the gated `:main` (`cascade: true`). With no tag releases it
