@@ -6,6 +6,11 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Fixed
+
+- `:latest` follows the gated `:main` (`cascade: true`). With no tag releases it
+  had frozen on the last image built before build-once (RT#1550).
+
 ### Changed
 
 - Builds move to constitution v1.39.1's container-release workflow: build once, gate the pushed digest (the toolchain check, run with podman against the digest), promote by digest. This image does not tag-release: `:main` follows merges and the units pull `:main`. GHCR is dropped; Quay.io is the only registry. RT#1550
