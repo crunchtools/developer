@@ -3,7 +3,7 @@
 > **Version:** 1.6.0
 > **Ratified:** 2026-11-06
 > **Status:** Active
-> **Inherits:** [crunchtools/constitution](https://github.com/crunchtools/constitution) v1.40.0
+> **Inherits:** [crunchtools/constitution](https://github.com/crunchtools/constitution) v1.41.0
 > **Profile:** Autonomous Agent
 
 Claude Code packaged as a container for agents that **build** the crunchtools
