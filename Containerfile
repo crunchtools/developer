@@ -53,7 +53,7 @@
 #
 # Build happens in GitHub Actions (.github/workflows/container.yml).
 
-FROM quay.io/podman/stable@sha256:f7a17ef911a2b9b866ada8a9426a07e29a6e4f8109ef8c0e0b7010c2541b4e49
+FROM quay.io/podman/stable@sha256:03af9a31e5bc973371614e496b5dae558491a3e93ee7cecfc98dd49755be19ac
 
 LABEL maintainer="fatherlinux <scott.mccarty@crunchtools.com>"
 LABEL version="1.6.0"
