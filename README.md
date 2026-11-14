@@ -50,6 +50,17 @@ this and not `claude-agent attach`. The session is deliberately not watched:
 quitting your own shell must not end the container. Nothing listens for an
 inbound connection.
 
+### Worker mode
+
+`JOSUI_MODE=worker` replaces the Remote Control server with one named
+interactive Claude Code (`claude -n "$JOSUI_NAME"`) in the same tmux session
+`dev`: a worker that Josui Prime messages as a peer and a person attaches to.
+`JOSUI_RC=1` turns Remote Control on for that conversation (the Max seats on
+Exedore); the Vertex workers on Dolza cannot use it and leave it unset.
+Onboarding, the Remote Control dialog and trust in `JOSUI_WORKDIR` are recorded
+as answered, so the unit never stalls on a first-run question. Here the tmux
+session *is* watched: the container ends when the session does.
+
 ## Running a repository's own gates
 
 The point of this image is that `sdlc push` runs here in minutes instead of a

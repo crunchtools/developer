@@ -102,12 +102,13 @@ edit_state_json() {
   [ -s "$state" ] || echo '{}' > "$state"
   tmp=$(mktemp "$HOME/.claude.json.XXXXXX")
   chmod 0600 "$tmp"
-  if ! JOSUI_STATE_EDIT=$1 python3 -c '
+  if ! JOSUI_STATE_EDIT=$1 JOSUI_TRUST_DIR=$workdir python3 -c '
 import json, os, sys
 
 with open(sys.argv[1]) as handle:
     state = json.load(handle)
-if os.environ["JOSUI_STATE_EDIT"] == "gateway":
+edit = os.environ["JOSUI_STATE_EDIT"]
+if edit == "gateway":
     state["mcpServers"] = {
         "trentina": {
             "type": "http",
@@ -117,6 +118,13 @@ if os.environ["JOSUI_STATE_EDIT"] == "gateway":
     }
 else:
     state["hasCompletedOnboarding"] = True
+if edit == "interactive":
+    # The first-run questions an unattended worker cannot answer: onboarding,
+    # the Remote Control dialog, and trust in the one directory the operator
+    # created for it.
+    state["remoteDialogSeen"] = True
+    project = state.setdefault("projects", {}).setdefault(os.environ["JOSUI_TRUST_DIR"], {})
+    project["hasTrustDialogAccepted"] = True
 with open(sys.argv[2], "w") as handle:
     json.dump(state, handle)
 ' "$state" "$tmp"; then
@@ -418,17 +426,51 @@ else
 fi
 server_args+=(--remote-control-session-name-prefix "${JOSUI_NAME:-josui}")
 
-# The Remote Control server and -- when a homeserver is configured --
-# claude-agent, side by side. When either ends the container ends, and the
-# unit restarts both.
+# JOSUI_MODE=worker: one named interactive Claude Code in tmux session `dev`,
+# instead of the Remote Control server -- a worker that Josui Prime messages
+# as a peer and a person attaches to. JOSUI_RC=1 turns Remote Control on for
+# that same conversation (Max seats); Vertex workers cannot use it and leave
+# it off. Window 1 is a shell, and a quit Claude Code leaves its pane to be
+# respawned, as with JOSUI_TMUX. The container ends only when the tmux
+# session does.
+start_worker_session() {
+  local tmux=${JOSUI_TMUX_CMD:-tmux} name=${JOSUI_NAME:-josui}
+  local args=(claude -n "$name")
+  if ! command -v "$tmux" > /dev/null 2>&1; then
+    log "JOSUI_MODE=worker needs $tmux, which is not in this image"
+    exit 1
+  fi
+  edit_state_json interactive
+  if [ "${JOSUI_RC:-}" = 1 ]; then
+    args+=(--remote-control "$name")
+  fi
+  args+=(--permission-mode "${JOSUI_PERMISSION_MODE:-acceptEdits}")
+  "$tmux" new-session -d -s dev -x 200 -y 50 -c "$workdir" "${args[@]}"
+  "$tmux" set-option -t dev remain-on-exit on 2>/dev/null || true
+  "$tmux" new-window -d -t dev -c "$workdir" 2>/dev/null || true
+  log "worker '$name' is up in tmux session 'dev': podman exec -it <service> tmux attach -t dev"
+}
+
+# The Remote Control server (or, for a worker, the tmux session holding its
+# one conversation) and -- when a homeserver is configured -- claude-agent,
+# side by side. When either ends the container ends, and the unit restarts
+# both.
 pids=()
-claude "${server_args[@]}" > /dev/null &
-pids+=($!)
+if [ "${JOSUI_MODE:-server}" = worker ]; then
+  start_worker_session
+  # Polled rather than waited on: tmux daemonises, so the session has no child
+  # pid here to wait for.
+  while "${JOSUI_TMUX_CMD:-tmux}" has-session -t dev 2>/dev/null; do sleep 5; done &
+  pids+=($!)
+else
+  claude "${server_args[@]}" > /dev/null &
+  pids+=($!)
+fi
 if [ -n "$session" ]; then
   claude-agent run -- --permission-mode "${JOSUI_PERMISSION_MODE:-acceptEdits}" &
   pids+=($!)
 fi
-if [ -n "${JOSUI_TMUX:-}" ]; then
+if [ -n "${JOSUI_TMUX:-}" ] && [ "${JOSUI_MODE:-server}" != worker ]; then
   start_tmux_session
 fi
 trap 'kill "${pids[@]}" 2>/dev/null' TERM INT
