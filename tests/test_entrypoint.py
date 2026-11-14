@@ -532,6 +532,51 @@ class EntrypointTest(unittest.TestCase):
         self.assertEqual(self.run_entrypoint().returncode, 0)
         self.assertFalse((self.home / "tmux-args").exists())
 
+    # JOSUI_MODE=worker: a named interactive Claude Code in tmux `dev`, no
+    # Remote Control server; JOSUI_RC=1 turns Remote Control on for it.
+    def worker_calls(self, **extra: str) -> tuple[subprocess.CompletedProcess[str], list[str]]:
+        self.fake_tmux()
+        env = {**self.env, "JOSUI_MODE": "worker", "JOSUI_NAME": "Vertex 1",
+               "JOSUI_PERMISSION_MODE": "bypassPermissions", **extra}
+        result = self.run_entrypoint(env=env)
+        return result, (self.home / "tmux-args").read_text().splitlines()
+
+    def test_worker_runs_a_named_session_in_tmux_without_the_server(self) -> None:
+        result, calls = self.worker_calls()
+        # The fake reports no session, so the watcher returns and the
+        # container ends -- which is what a unit restart relies on.
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(
+            calls[0],
+            f"new-session -d -s dev -x 200 -y 50 -c {self.home / 'work'} claude -n Vertex 1 "
+            "--permission-mode bypassPermissions",
+        )
+        self.assertIn("set-option -t dev remain-on-exit on", calls)
+        self.assertIn("has-session -t dev", calls)
+        self.assertFalse((self.home / "claude-args").exists())
+        self.assertIn("worker 'Vertex 1' is up", result.stderr)
+
+    def test_worker_with_remote_control_names_it(self) -> None:
+        _, calls = self.worker_calls(JOSUI_NAME="Max 1", JOSUI_RC="1")
+        self.assertIn("claude -n Max 1 --remote-control Max 1 --permission-mode bypassPermissions", calls[0])
+
+    def test_worker_answers_the_first_run_questions(self) -> None:
+        self.worker_calls()
+        data = json.loads((self.home / ".claude.json").read_text())
+        self.assertTrue(data["hasCompletedOnboarding"])
+        self.assertTrue(data["remoteDialogSeen"])
+        self.assertTrue(data["projects"][str(self.home / "work")]["hasTrustDialogAccepted"])
+
+    def test_worker_does_not_also_start_the_josui_tmux_session(self) -> None:
+        _, calls = self.worker_calls(JOSUI_TMUX="1")
+        self.assertEqual(sum(c.startswith("new-session") for c in calls), 1)
+
+    def test_worker_without_tmux_fails_loudly(self) -> None:
+        env = {**self.env, "JOSUI_MODE": "worker", "JOSUI_TMUX_CMD": "tmux-that-is-not-installed"}
+        result = self.run_entrypoint(env=env)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("needs tmux-that-is-not-installed", result.stderr)
+
     def test_tmux_missing_from_the_image_is_reported_not_fatal(self) -> None:
         env = {**self.env, "JOSUI_TMUX": "1", "JOSUI_TMUX_CMD": "tmux-that-is-not-installed"}
         result = self.run_entrypoint(env=env)
