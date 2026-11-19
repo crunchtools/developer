@@ -1,5 +1,5 @@
 [Unit]
-Description=Copy each Max seat's josui-skills sync status to pCloud for Nagios (developer#42)
+Description=Copy each Max seat's josui-skills sync status to pCloud for Nagios (#42)
 Documentation=https://github.com/crunchtools/claude/tree/main/deploy
 
 [Service]
