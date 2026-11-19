@@ -1,7 +1,7 @@
 #!/bin/sh
 # Report this seat's turn and task to the Ashigaru Desk, or do nothing.
 #
-# Run by Claude Code's managed hooks (40-developer-seat.json) beside
+# Run by Claude Code's managed hooks (40-claude-seat.json) beside
 # seat-state, which keeps ~/.claude/seat-state.json until the Desk cutover:
 #
 #   ashigaru-hook session-start | prompt-submit | stop

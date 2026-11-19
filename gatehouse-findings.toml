@@ -1,7 +1,7 @@
 [[findings]]
 agent = "bugs"
 category = "bug"
-file = "rootfs/usr/local/bin/developer-skills-sync"
+file = "rootfs/usr/local/bin/claude-skills-sync"
 evidence = "tmp=$(mktemp \"$status_file.XXXXXX\") || { log \"cannot write $status_file\"; exit 0; }"
 status = "not-a-bug"
 reason = "The template is $status_file.XXXXXX and status_file is $repo/.git/skills-sync.status, so mktemp already creates the temporary file in .git beside its destination, on the same filesystem; mv is a same-directory rename. This is the suggested fix."
@@ -9,7 +9,7 @@ reason = "The template is $status_file.XXXXXX and status_file is $repo/.git/skil
 [[findings]]
 agent = "consistency"
 category = "quality"
-file = "rootfs/usr/local/bin/developer-skills-sync"
+file = "rootfs/usr/local/bin/claude-skills-sync"
 evidence = "status_file=$repo/.git/skills-sync.status"
 status = "not-a-bug"
 reason = "The status file lives in .git on purpose: it is on the checkout's own volume wherever that is mounted, git ignores it, and the host push reads it at the same relative path on Dolza and Exedore. It is built from repo like every other path in the script."
@@ -17,7 +17,7 @@ reason = "The status file lives in .git on purpose: it is on the checkout's own 
 [[findings]]
 agent = "general"
 category = "quality"
-file = "rootfs/usr/local/bin/developer-skills-sync"
+file = "rootfs/usr/local/bin/claude-skills-sync"
 evidence = "tmp=$(mktemp \"$status_file.XXXXXX\") || { log \"cannot write $status_file\"; exit 0; }"
 status = "not-a-bug"
 reason = "The template is $status_file.XXXXXX and status_file is $repo/.git/skills-sync.status, so mktemp already creates the temporary file in .git beside its destination, on the same filesystem; mv is a same-directory rename. This is the suggested fix."
@@ -25,7 +25,7 @@ reason = "The template is $status_file.XXXXXX and status_file is $repo/.git/skil
 [[findings]]
 agent = "consistency"
 category = "quality"
-file = "rootfs/usr/local/bin/developer-skills-sync"
+file = "rootfs/usr/local/bin/claude-skills-sync"
 evidence = "tmp=$(mktemp \"$status_file.XXXXXX\") || { log \"cannot write $status_file\"; exit 0; }"
 status = "not-a-bug"
 reason = "By design and documented in the header: a failed step is reported on stderr and the pass exits 0, because the entrypoint runs it at start under set -e and in the background loop, where a non-zero exit must not stop the seat. skills-sync-push is a one-shot unit whose failure systemd should record, so it exits 1."

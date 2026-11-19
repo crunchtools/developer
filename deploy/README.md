@@ -1,7 +1,7 @@
 # Host side of the skills sync (#42)
 
 The seats keep their josui-skills checkouts current themselves
-(`developer-skills-sync`, every `JOSUI_SKILLS_SYNC_INTERVAL` seconds). What a
+(`claude-skills-sync`, every `JOSUI_SKILLS_SYNC_INTERVAL` seconds). What a
 host adds is the monitoring route: Nagios runs only on gloval, so each host
 copies its seats' status lines to pCloud, where `check_skills_sync.sh`
 (crunchtools/nagios-agent) reads them.
@@ -11,7 +11,7 @@ copies its seats' status lines to pCloud, where `check_skills_sync.sh`
 | Dolza | one, shared: Josui Prime mounts it read-write and syncs it, the seats mount it read-only and only relink | `dolza.shared` |
 | Exedore | one per seat, `/srv/maxN/data/josui-skills`, synced inside each seat | `exedore.max1` … `exedore.max4` |
 
-Order: the seats first (an image with `developer-skills-sync`), then these
+Order: the seats first (an image with `claude-skills-sync`), then these
 timers, then nagios-agent's `skills-sync.conf` and services on gloval. The
 services warn "no marker" until a timer has pushed, so installing them first
 only means a known WARNING until then.

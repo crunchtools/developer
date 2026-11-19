@@ -1,4 +1,4 @@
-"""developer-skills-sync, run against throwaway git repositories (#42)."""
+"""claude-skills-sync, run against throwaway git repositories (#42)."""
 
 from __future__ import annotations
 
@@ -9,7 +9,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-SYNC = Path(__file__).resolve().parent.parent / "rootfs/usr/local/bin/developer-skills-sync"
+SYNC = Path(__file__).resolve().parent.parent / "rootfs/usr/local/bin/claude-skills-sync"
 
 
 def status_of(repo: Path) -> dict[str, str]:

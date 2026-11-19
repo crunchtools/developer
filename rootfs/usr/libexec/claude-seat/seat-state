@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Tell /agents whether this seat is busy and who is driving it.
 
-Run by Claude Code's managed hooks (40-developer-seat.json) with the event on
+Run by Claude Code's managed hooks (40-claude-seat.json) with the event on
 stdin, and writes ~/.claude/seat-state.json:
 
   seat-state prompt   UserPromptSubmit. Every prompt starts a turn: turn is
@@ -27,7 +27,7 @@ Every handler reads, changes and replaces the file under an exclusive flock on
   seat-state start    SessionStart. A new process (startup, resume) or a
                       /clear is not mid-turn, so turn is idle. source=clear
                       also frees the seat and pins the new conversation's
-                      UUID for developer-worker-claude, so a respawn does not
+                      UUID for claude-worker, so a respawn does not
                       bring back the cleared one. source=compact can come
                       mid-turn and changes nothing.
 

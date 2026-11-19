@@ -1,7 +1,7 @@
 #!/bin/bash
-# developer-skills-sync -- keep a josui-skills checkout current and linked (#42).
+# claude-skills-sync -- keep a josui-skills checkout current and linked (#42).
 #
-# developer-entrypoint runs one pass at start and then one every
+# claude-entrypoint runs one pass at start and then one every
 # JOSUI_SKILLS_SYNC_INTERVAL seconds (600) for as long as the seat is up, so a
 # josui-skills merge goes live without a restart. On Dolza the checkout is
 # shared: Josui Prime mounts it read-write and its passes keep it current,
@@ -36,7 +36,7 @@
 
 set -uo pipefail
 
-usage() { echo "usage: developer-skills-sync [--link CLAUDE_DIR] SKILLS_DIR" >&2; exit 2; }
+usage() { echo "usage: claude-skills-sync [--link CLAUDE_DIR] SKILLS_DIR" >&2; exit 2; }
 log() { echo "skills-sync: $*" >&2; }
 
 link=

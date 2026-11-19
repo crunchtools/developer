@@ -25,7 +25,7 @@
 # by Claude Code, is never found here, and gets a new conversation each start.
 set -euo pipefail
 
-log() { echo "developer-worker-claude: $*" >&2; }
+log() { echo "claude-worker: $*" >&2; }
 
 state="$HOME/.config/josui/session-id"
 project="$HOME/.claude/projects/$(pwd -P | sed 's/[^a-zA-Z0-9]/-/g')"

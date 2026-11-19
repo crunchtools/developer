@@ -18,8 +18,8 @@ import time
 import unittest
 from pathlib import Path
 
-ENTRYPOINT = Path(__file__).resolve().parent.parent / "rootfs/usr/local/bin/developer-entrypoint"
-WORKER_CLAUDE = ENTRYPOINT.with_name("developer-worker-claude")
+ENTRYPOINT = Path(__file__).resolve().parent.parent / "rootfs/usr/local/bin/claude-entrypoint"
+WORKER_CLAUDE = ENTRYPOINT.with_name("claude-worker")
 
 FAKE_CLAUDE = """#!/bin/bash
 printf '%s\\n' "$@" > "$HOME/claude-args"
@@ -842,7 +842,7 @@ class EntrypointTest(EntrypointCase):
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual(
             calls[0],
-            f"new-session -d -s dev -x 200 -y 50 -c {self.home / 'work'} developer-worker-claude -n Vertex 1 "
+            f"new-session -d -s dev -x 200 -y 50 -c {self.home / 'work'} claude-worker -n Vertex 1 "
             "--permission-mode bypassPermissions",
         )
         self.assertIn("set-option -t dev remain-on-exit on", calls)
@@ -859,7 +859,7 @@ class EntrypointTest(EntrypointCase):
     def test_worker_with_remote_control_names_it(self) -> None:
         _, calls = self.worker_calls(JOSUI_NAME="Max 1", JOSUI_RC="1")
         self.assertIn(
-            "developer-worker-claude -n Max 1 --remote-control Max 1 --permission-mode bypassPermissions",
+            "claude-worker -n Max 1 --remote-control Max 1 --permission-mode bypassPermissions",
             calls[0],
         )
 
@@ -893,7 +893,7 @@ class EntrypointTest(EntrypointCase):
         self.assertEqual(self.run_entrypoint().returncode, 0)
         self.assertFalse((self.home / "agent-ran").exists())
 
-    # developer-worker-claude, the program in a worker's pane. It pins one
+    # claude-worker, the program in a worker's pane. It pins one
     # session UUID per seat in ~/.config/josui/session-id: --resume it when its
     # transcript holds a user turn, else --session-id (a fresh conversation).
     # Claude Code refuses both flags, exit 1, on a transcript with no
@@ -1207,12 +1207,12 @@ class EntrypointTest(EntrypointCase):
         self.assertIn("under claude-agent with texting", result.stderr)
         self.assertEqual(self.agent_env()["CLAUDE_AGENT_MATRIX_HOMESERVER"], "http://192.0.2.3:6167")
 
-    # The supervisor runs developer-worker-claude, so the texted worker
+    # The supervisor runs claude-worker, so the texted worker
     # continues its conversation at every (re)spawn as a seat does.
     def test_texted_worker_continues_through_the_wrapper(self) -> None:
         self.fake_tmux()
         self.run_entrypoint(env={**self.session_env(), "JOSUI_MODE": "worker", "JOSUI_NAME": "Josui Prime"})
-        self.assertEqual(self.agent_env()["CLAUDE_AGENT_CLAUDE"], "developer-worker-claude")
+        self.assertEqual(self.agent_env()["CLAUDE_AGENT_CLAUDE"], "claude-worker")
 
     def test_text_session_beside_the_server_runs_plain_claude(self) -> None:
         self.run_entrypoint(env=self.session_env())
@@ -1235,7 +1235,7 @@ class EntrypointTest(EntrypointCase):
         result, calls = self.worker_calls()
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertFalse((self.home / "agent-ran").exists())
-        self.assertIn("developer-worker-claude -n Vertex 1", calls[0])
+        self.assertIn("claude-worker -n Vertex 1", calls[0])
 
     def test_texted_worker_without_remote_control_omits_it(self) -> None:
         self.fake_tmux()

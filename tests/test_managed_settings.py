@@ -7,8 +7,7 @@ import unittest
 from pathlib import Path
 
 MANAGED = (
-    Path(__file__).resolve().parent.parent
-    / "rootfs/etc/claude-code/managed-settings.d/40-developer-seat.json"
+    Path(__file__).resolve().parent.parent / "rootfs/etc/claude-code/managed-settings.d/40-claude-seat.json"
 )
 
 
