@@ -1,5 +1,5 @@
 [Unit]
-Description=Copy josui-skills sync status to pCloud every 10 minutes (developer#42)
+Description=Copy josui-skills sync status to pCloud every 10 minutes (#42)
 
 [Timer]
 OnBootSec=5min

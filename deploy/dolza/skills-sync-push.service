@@ -1,6 +1,6 @@
 [Unit]
-Description=Copy the shared josui-skills sync status to pCloud for Nagios (developer#42)
-Documentation=https://github.com/crunchtools/developer/tree/main/deploy
+Description=Copy the shared josui-skills sync status to pCloud for Nagios (#42)
+Documentation=https://github.com/crunchtools/claude/tree/main/deploy
 
 [Service]
 Type=oneshot

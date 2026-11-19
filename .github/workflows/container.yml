@@ -1,9 +1,9 @@
 name: Container
 
-# The development agent image: developer1-3 on gloval, the agents that BUILD
-# the fleet. Build once per change, gate the pushed digest, promote what was
-# tested (constitution container-image VII). Published images are scanned on
-# a schedule by the fleet CVE check (RT #1551), not in this build.
+# The claude image: Josui Prime and the worker seats on dolza and exedore.
+# Build once per change, gate the pushed digest, promote what was tested
+# (constitution container-image VII). Published images are scanned on a
+# schedule by the fleet CVE check (RT #1551), not in this build.
 #
 # `parent-image-updated` is load-bearing: the base is pinned by digest, so
 # the `dnf -y upgrade` in the
@@ -23,6 +23,70 @@ permissions: {}
 
 jobs:
   container:
+    uses: crunchtools/constitution/.github/workflows/container-release.yml@v1.51.0
+    permissions:
+      contents: read
+      issues: write   # the alert job files a failed schedule as an issue
+      pull-requests: read
+    with:
+      image: quay.io/crunchtools/claude
+      # No tag releases (constitution), so :latest follows the gated :main
+      # instead of freezing on the last pre-build-once image (RT#1550).
+      cascade: true
+      boot: command
+      boot-timeout: 600
+      # Every tool an agent in the image needs answers. The entrypoint is
+      # bypassed (it needs the Josui mounts); the nested engine is not run
+      # (a property of the host, settled on gloval, RT#1556).
+      boot-command: |
+        labels() { podman image inspect --format "{{index .Config.Labels \"$1\"}}" "$IMAGE"; }
+        test "$(labels org.opencontainers.image.version)" = "$(labels version)"
+        podman run --rm --entrypoint /bin/bash \
+          --device /dev/fuse --security-opt label=disable \
+          "$IMAGE" -c '
+          set -euxo pipefail
+          claude --version
+          claude-agent --version
+          python3 -c "import sys; assert sys.version_info[:2] >= (3, 14), sys.version"
+          uv --version
+          tmux -V
+          git --version
+          node --version
+          pre-commit --version
+          podman --version
+          bash -n /usr/local/bin/claude-entrypoint
+          bash -n /usr/local/bin/claude-worker
+          test -x /usr/local/bin/claude-worker
+          test -x /usr/libexec/claude-seat/seat-state
+          test -x /usr/libexec/claude-seat/ashigaru-hook
+          ashigaru --help > /dev/null
+          test "$(rpm -q --qf "%{VERSION}" ashigaru)" = 3.3.0
+          test "$(python3 -c "import ashigaru; print(ashigaru.__version__)")" = 3.3.0
+          test -f /etc/claude-code/.claude/skills/ashigaru/SKILL.md
+          grep -q "^name: ashigaru$" /etc/claude-code/.claude/skills/ashigaru/SKILL.md
+          test "$ASHIGARU_URL" = https://ashigaru.crunchtools.com
+          echo "{}" | /usr/libexec/claude-seat/ashigaru-hook stop
+          python3 -m json.tool /etc/claude-code/managed-settings.d/40-claude-seat.json > /dev/null
+          test ! -e /etc/claude-code/managed-settings.d/40-developer-seat.json
+          test "$(readlink -f /usr/local/bin/developer-entrypoint)" = /usr/local/bin/claude-entrypoint
+          test "$(readlink -f /usr/local/bin/developer-worker-claude)" = /usr/local/bin/claude-worker
+          test "$(readlink -f /usr/local/bin/developer-skills-sync)" = /usr/local/bin/claude-skills-sync
+          test -x /usr/libexec/developer/seat-state
+          test -x /usr/libexec/developer/ashigaru-hook
+        '
+    secrets:
+      QUAY_USERNAME: ${{ secrets.QUAY_USERNAME }}
+      QUAY_PASSWORD: ${{ secrets.QUAY_PASSWORD }}
+
+  # The old name, kept moving for one release so units still pulling
+  # quay.io/crunchtools/developer:latest (AutoUpdate=registry) get the same
+  # change until they are repointed (#41). A second gated build of the same
+  # commit, not a copy: the reusable workflow promotes only what it gated
+  # itself. Not on pull requests, so a PR gates and pushes `claude` only and
+  # a merge here rebuilds (resolve finds no gated `developer` digest).
+  # Delete this job once no unit names `developer`.
+  container-developer:
+    if: github.event_name != 'pull_request'
     uses: crunchtools/constitution/.github/workflows/container-release.yml@v1.51.0
     permissions:
       contents: read
@@ -54,19 +118,25 @@ jobs:
           node --version
           pre-commit --version
           podman --version
-          bash -n /usr/local/bin/developer-entrypoint
-          bash -n /usr/local/bin/developer-worker-claude
-          test -x /usr/local/bin/developer-worker-claude
-          test -x /usr/libexec/developer/seat-state
-          test -x /usr/libexec/developer/ashigaru-hook
+          bash -n /usr/local/bin/claude-entrypoint
+          bash -n /usr/local/bin/claude-worker
+          test -x /usr/local/bin/claude-worker
+          test -x /usr/libexec/claude-seat/seat-state
+          test -x /usr/libexec/claude-seat/ashigaru-hook
           ashigaru --help > /dev/null
           test "$(rpm -q --qf "%{VERSION}" ashigaru)" = 3.3.0
           test "$(python3 -c "import ashigaru; print(ashigaru.__version__)")" = 3.3.0
           test -f /etc/claude-code/.claude/skills/ashigaru/SKILL.md
           grep -q "^name: ashigaru$" /etc/claude-code/.claude/skills/ashigaru/SKILL.md
           test "$ASHIGARU_URL" = https://ashigaru.crunchtools.com
-          echo "{}" | /usr/libexec/developer/ashigaru-hook stop
-          python3 -m json.tool /etc/claude-code/managed-settings.d/40-developer-seat.json > /dev/null
+          echo "{}" | /usr/libexec/claude-seat/ashigaru-hook stop
+          python3 -m json.tool /etc/claude-code/managed-settings.d/40-claude-seat.json > /dev/null
+          test ! -e /etc/claude-code/managed-settings.d/40-developer-seat.json
+          test "$(readlink -f /usr/local/bin/developer-entrypoint)" = /usr/local/bin/claude-entrypoint
+          test "$(readlink -f /usr/local/bin/developer-worker-claude)" = /usr/local/bin/claude-worker
+          test "$(readlink -f /usr/local/bin/developer-skills-sync)" = /usr/local/bin/claude-skills-sync
+          test -x /usr/libexec/developer/seat-state
+          test -x /usr/libexec/developer/ashigaru-hook
         '
     secrets:
       QUAY_USERNAME: ${{ secrets.QUAY_USERNAME }}

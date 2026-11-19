@@ -19,8 +19,8 @@ from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 ROOTFS = Path(__file__).resolve().parent.parent / "rootfs"
-SEAT_STATE = ROOTFS / "usr/libexec/developer/seat-state"
-MANAGED = ROOTFS / "etc/claude-code/managed-settings.d/40-developer-seat.json"
+SEAT_STATE = ROOTFS / "usr/libexec/claude-seat/seat-state"
+MANAGED = ROOTFS / "etc/claude-code/managed-settings.d/40-claude-seat.json"
 
 FIRST = "4c3d8432-626e-4ab4-9b5d-6e5e958ce0be"
 CLEARED = "7bbc1c5f-636e-473c-9820-c34794004e1c"
@@ -257,7 +257,7 @@ class SeatStateTest(unittest.TestCase):
         self.assertNotIn("task", seat)
         self.assertEqual(seat["turn"], "idle")
 
-    # developer-worker-claude resumes the pinned UUID: re-pinned to the cleared
+    # claude-worker resumes the pinned UUID: re-pinned to the cleared
     # conversation, a respawn does not bring the old one back.
     def test_clear_repins_the_session(self) -> None:
         self.pin.parent.mkdir(parents=True)
@@ -326,7 +326,7 @@ class ManagedSettingsTest(unittest.TestCase):
             event: [h["command"] for group in hooks[event] for h in group["hooks"]]
             for event in ("UserPromptSubmit", "Stop", "StopFailure", "Notification", "SessionStart")
         }
-        state, desk = "/usr/libexec/developer/seat-state", "/usr/libexec/developer/ashigaru-hook"
+        state, desk = "/usr/libexec/claude-seat/seat-state", "/usr/libexec/claude-seat/ashigaru-hook"
         # Both until the Desk cutover: seat-state.json and the Desk.
         self.assertEqual(commands["UserPromptSubmit"], [f"{state} prompt", f"{desk} prompt-submit"])
         self.assertEqual(commands["Stop"], [f"{state} stop", f"{desk} stop"])

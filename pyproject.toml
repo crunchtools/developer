@@ -3,7 +3,7 @@
 # lockfile that names mypy and pytest the gate exits 2 (python-sdlc,
 # need_lock_dep) rather than reporting a pass it never ran.
 [project]
-name = "developer"
+name = "claude"
 version = "0"
 requires-python = ">=3.10"
 dependencies = []

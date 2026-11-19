@@ -3,7 +3,7 @@
 #
 # Usage: skills-sync-push HOST SEAT=STATUS_FILE...
 #
-# developer-skills-sync writes one status line into each checkout it keeps
+# claude-skills-sync writes one status line into each checkout it keeps
 # (.git/skills-sync.status). Nagios runs only on gloval and cannot see a seat,
 # so a timer on each host runs this to copy every line to
 # $SKILLS_SYNC_REMOTE/<host>.<seat> (default pcloud:Monitoring/SkillsSync),

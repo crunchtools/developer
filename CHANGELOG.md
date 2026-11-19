@@ -6,6 +6,13 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Deprecated
+- For one release the old names stay: the image is also published as
+  `quay.io/crunchtools/developer` (a second gated build of each push to
+  `main`), and the old command and hook paths are links to the new ones.
+  `40-developer-seat.json` is not kept, since two copies would run every seat
+  hook twice. Both go once Dolza's and Exedore's units name `claude`.
+
 ### Fixed
 - Gatehouse gates no longer "COULD NOT RUN" on seats whose gateway URL names
   the gateway over plain http (`http://trentina:8019`, the Vertex seats)
@@ -16,6 +23,12 @@ All notable changes to this project are documented here. The format follows
   untouched.
 
 ### Changed
+- Renamed for the software rather than one role (#41): the repository is
+  `crunchtools/claude` and the image `quay.io/crunchtools/claude`. In the
+  image, `developer-entrypoint` is `claude-entrypoint`,
+  `developer-worker-claude` is `claude-worker`, `developer-skills-sync` is
+  `claude-skills-sync`, `/usr/libexec/developer` is `/usr/libexec/claude-seat`
+  and the seat hooks are `40-claude-seat.json`.
 - The container release runs constitution v1.51.0's `container-release.yml`
   (was v1.46.0) and grants it `issues: write`, so a failed scheduled rebuild
   opens an issue instead of only warning. A `v*` promote now also refuses an

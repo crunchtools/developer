@@ -9,7 +9,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-HOOK = Path(__file__).resolve().parent.parent / "rootfs/usr/libexec/developer/ashigaru-hook"
+HOOK = Path(__file__).resolve().parent.parent / "rootfs/usr/libexec/claude-seat/ashigaru-hook"
 EVENT = '{"hook_event_name": "UserPromptSubmit", "prompt": "hi"}'
 
 

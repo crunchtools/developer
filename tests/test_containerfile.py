@@ -56,3 +56,36 @@ class ImageCopyTmpDirTest(unittest.TestCase):
     def test_buildah_stages_under_the_storage_volume(self) -> None:
         conf = ROOT / "rootfs/etc/containers/containers.conf.d/50-image-copy-tmp-dir.conf"
         self.assertRegex(conf.read_text(), r'(?ms)^\[engine\]$.*^image_copy_tmp_dir = "storage"$')
+
+
+class OldNamesTest(unittest.TestCase):
+    # The image was `developer` (#41): for one release the old command and
+    # hook paths are links to the new ones, so a unit or a person using them
+    # still lands on the same program.
+    LINKS = {
+        "/usr/local/bin/developer-entrypoint": "claude-entrypoint",
+        "/usr/local/bin/developer-worker-claude": "claude-worker",
+        "/usr/local/bin/developer-skills-sync": "claude-skills-sync",
+        "/usr/libexec/developer": "claude-seat",
+    }
+
+    def test_the_old_names_link_to_the_new(self) -> None:
+        text = CONTAINERFILE.read_text()
+        for old, new in self.LINKS.items():
+            self.assertIn(f"ln -s {new} {old}", text)
+            self.assertTrue((ROOT / "rootfs" / Path(old).parent.relative_to("/") / new).exists(), new)
+
+    def test_the_old_paths_are_not_shipped_as_files(self) -> None:
+        for old in self.LINKS:
+            self.assertFalse((ROOT / "rootfs" / old.lstrip("/")).exists(), old)
+
+    # Every managed-settings fragment is loaded: a second copy of the seat
+    # hooks under the old name would run each of them twice.
+    def test_only_the_new_seat_settings_are_shipped(self) -> None:
+        managed = ROOT / "rootfs/etc/claude-code/managed-settings.d"
+        self.assertTrue((managed / "40-claude-seat.json").is_file())
+        self.assertFalse((managed / "40-developer-seat.json").exists())
+
+    def test_the_entrypoint_finds_skills_sync_beside_its_real_path(self) -> None:
+        entrypoint = (ROOT / "rootfs/usr/local/bin/claude-entrypoint").read_text()
+        self.assertIn('"$(dirname "$(readlink -f "$0")")/claude-skills-sync"', entrypoint)

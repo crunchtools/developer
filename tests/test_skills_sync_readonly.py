@@ -1,4 +1,4 @@
-"""developer-skills-sync on a checkout it cannot write (#42).
+"""claude-skills-sync on a checkout it cannot write (#42).
 
 Its own file because it is skipped as root, which writes through a read-only
 mode. Gourmand matches an exception by path alone, so the exception for this

@@ -1,6 +1,6 @@
-# developer Constitution
+# claude Constitution
 
-> **Version:** 3.0.0
+> **Version:** 3.1.0
 > **Ratified:** 2026-11-06
 > **Status:** Active
 > **Inherits:** [crunchtools/constitution](https://github.com/crunchtools/constitution) v1.46.0
@@ -91,7 +91,7 @@ start, replacing whatever was there.
 
 ## Layer 3 — Container & Supply Chain Security
 
-- **Image:** `quay.io/crunchtools/developer` (Quay.io is the only registry),
+- **Image:** `quay.io/crunchtools/claude` (Quay.io is the only registry),
   public. Tooling only; identity and credentials are mounted.
 - **Base:** `quay.io/podman/stable`, pinned by digest, the same digest
   gha-runner runs. **Not UBI**: UBI 10 fails a nested `podman run` with "mount
@@ -147,7 +147,7 @@ A second one is on its way out — an OpenRouter API key for
 Gatehouse, the gate that reviews code with an LLM, mounted at
 `/etc/josui/mcp-env` because `envscrub` would strip it from the environment
 and the gate would then die reporting that it could not run.
-`developer-entrypoint` writes `~/.config/mcp-env/gatehouse.env` itself when
+`claude-entrypoint` writes `~/.config/mcp-env/gatehouse.env` itself when
 the mount provides none, pointing Gatehouse at the gateway's
 `/proxy/llm/openrouter` route with this seat's own token as the key. The URL
 is derived from `TRENTINA_MCP_URL` and is not settable on its own, because
@@ -267,6 +267,7 @@ crunchtools/nagios-agent compares the two containers' start times and says so.
 
 | Version | Date | Changes |
 |---------|------|---------|
+| 3.1.0 | 2026-11-19 | Renamed for the software, not one role: repo `crunchtools/claude`, image `quay.io/crunchtools/claude`, in-image names `claude-entrypoint`, `claude-worker`, `claude-skills-sync`, `/usr/libexec/claude-seat`, `40-claude-seat.json`. For one release the image is also published as `developer` and the old names are links. #41 |
 | 2.0.0 | 2026-11-14 | The image has two roles. Josui Prime moves onto it from the UBI josui image (owner allowed Fedora; one image, not two), with Prime's identity, state, operator profile and RCS text path set by its unit. Workers (Vertex 1-4 on dolza, Max 1-4 on exedore, formerly developer1-3 on gloval) keep every boundary this document set, including no text path. MAJOR because "an agent built from this image has no production reach" stops being true of the image and becomes true of the worker units |
 | 1.6.0 | 2026-11-11 | The blocking Trivy gate and `.trivyignore` are retired along with the fleet's build-time scan (constitution 1.40.0): published images are scanned on a schedule by the fleet CVE check (RT #1551) |
 | 1.5.0 | 2026-11-07 | Gatehouse calls `/proxy/llm/openrouter-gatehouse/v1`, a second gateway route to the same upstream carrying its own key, so a seat has two token endpoints: one the L3 judge spends on and one Gatehouse does. All Gatehouse usage then lands on one key fleet-wide (RT#1559). Also ships #12: a seat tracks the skills repository's default branch rather than whatever its volume was seeded with |

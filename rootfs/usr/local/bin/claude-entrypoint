@@ -1,7 +1,7 @@
 #!/bin/bash
 # Assemble Josui's Claude Code home from what was mounted, then serve Remote
 # Control. Anything given as arguments runs instead, with the same home:
-#   podman run -it ... quay.io/crunchtools/developer claude auth login
+#   podman run -it ... quay.io/crunchtools/claude claude auth login
 set -euo pipefail
 
 config_dir=${JOSUI_CONFIG_DIR:?JOSUI_CONFIG_DIR is not set}
@@ -178,12 +178,12 @@ if [ -n "$git_url" ] && [ -n "${TRENTINA_MCP_TOKEN:-}" ]; then
   git config --global --get-all include.path | grep -qxF "$gitconf" ||
     git config --global --add include.path "$gitconf"
 fi
-# Skills are a git checkout on a volume, kept current by developer-skills-sync
+# Skills are a git checkout on a volume, kept current by claude-skills-sync
 # (#42): one pass now, then one every JOSUI_SKILLS_SYNC_INTERVAL seconds in
 # the background (sync_loop, below), so a josui-skills merge goes live without
 # a restart. A failed pass is not fatal: the checkout that is there still
 # works, and the network may be the thing down.
-skills_sync=("$(dirname "$(readlink -f "$0")")/developer-skills-sync" --link "$claude_dir" "$skills_repo")
+skills_sync=("$(dirname "$(readlink -f "$0")")/claude-skills-sync" --link "$claude_dir" "$skills_repo")
 "${skills_sync[@]}"
 
 # Claude Code's state file is JSON holding things only it knows about, so it
@@ -360,7 +360,7 @@ install_mcp_env() {
 # (gatehouse/llm.py `_is_private`), and refuses a name on purpose: it cannot
 # know where a name resolves. The seat units name the gateway on the container
 # bridge (`http://trentina:8019/...`), so that URL made every gate "COULD NOT
-# RUN" (crunchtools/developer#89).
+# RUN" (crunchtools/claude#89).
 #
 # So the name is resolved here, once, at start, and replaced by its address --
 # but only when that address is one Gatehouse would accept anyway. A name that
@@ -521,7 +521,7 @@ install_gatehouse_env() {
   # seat token rotates, and a stale one is a gate that fails rather than one
   # that could not run.
   cat > "$tmp" <<ENVEOF
-# Written by developer-entrypoint at container start. Do not edit: it is
+# Written by claude-entrypoint at container start. Do not edit: it is
 # replaced on every start. See RT#1559.
 GATEHOUSE_LLM_BASE_URL=$url
 OPENROUTER_API_KEY=$gateway_token
@@ -572,11 +572,11 @@ server_args+=(--remote-control-session-name-prefix "${JOSUI_NAME:-josui}")
 # seconds later by the pane-died hook -- a worker Prime cannot message is no
 # worker -- and the delay keeps one that cannot start (not logged in) from
 # spinning. The container ends only when the tmux session does.
-# developer-worker-claude resumes the seat's pinned conversation, so a
+# claude-worker resumes the seat's pinned conversation, so a
 # restart keeps its one claude.ai entry instead of adding another.
 start_worker_session() {
   local tmux=${JOSUI_TMUX_CMD:-tmux} name=${JOSUI_NAME:-josui}
-  local args=(developer-worker-claude -n "$name")
+  local args=(claude-worker -n "$name")
   if ! command -v "$tmux" > /dev/null 2>&1; then
     log "JOSUI_MODE=worker needs $tmux, which is not in this image"
     exit 1
@@ -606,7 +606,7 @@ start_worker_session() {
 # session here: run inside one, that attach would nest tmux. The supervisor
 # is the supervised pid: when Claude Code exits the container ends and the
 # unit restarts it. CLAUDE_AGENT_CLAUDE makes the supervisor run
-# developer-worker-claude, so this conversation is resumed too -- at every
+# claude-worker, so this conversation is resumed too -- at every
 # start, CLAUDE_AGENT_RESPAWN's included, not once here.
 start_supervised_worker() {
   local tmux=${JOSUI_TMUX_CMD:-tmux} name=${JOSUI_NAME:-josui}
@@ -620,7 +620,7 @@ start_supervised_worker() {
     args+=(--remote-control "$name")
   fi
   args+=(--permission-mode "${JOSUI_PERMISSION_MODE:-acceptEdits}")
-  CLAUDE_AGENT_CLAUDE=developer-worker-claude claude-agent run -- "${args[@]}" &
+  CLAUDE_AGENT_CLAUDE=claude-worker claude-agent run -- "${args[@]}" &
   pids+=($!)
   log "worker '$name' is up under claude-agent with texting: podman exec -it <service> claude-agent attach --rw"
 }

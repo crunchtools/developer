@@ -11,12 +11,12 @@
         "hooks": [
           {
             "type": "command",
-            "command": "/usr/libexec/developer/seat-state prompt",
+            "command": "/usr/libexec/claude-seat/seat-state prompt",
             "timeout": 10
           },
           {
             "type": "command",
-            "command": "/usr/libexec/developer/ashigaru-hook prompt-submit",
+            "command": "/usr/libexec/claude-seat/ashigaru-hook prompt-submit",
             "timeout": 10
           }
         ]
@@ -27,12 +27,12 @@
         "hooks": [
           {
             "type": "command",
-            "command": "/usr/libexec/developer/seat-state start",
+            "command": "/usr/libexec/claude-seat/seat-state start",
             "timeout": 10
           },
           {
             "type": "command",
-            "command": "/usr/libexec/developer/ashigaru-hook session-start",
+            "command": "/usr/libexec/claude-seat/ashigaru-hook session-start",
             "timeout": 10
           }
         ]
@@ -43,12 +43,12 @@
         "hooks": [
           {
             "type": "command",
-            "command": "/usr/libexec/developer/seat-state stop",
+            "command": "/usr/libexec/claude-seat/seat-state stop",
             "timeout": 10
           },
           {
             "type": "command",
-            "command": "/usr/libexec/developer/ashigaru-hook stop",
+            "command": "/usr/libexec/claude-seat/ashigaru-hook stop",
             "timeout": 10
           }
         ]
@@ -59,12 +59,12 @@
         "hooks": [
           {
             "type": "command",
-            "command": "/usr/libexec/developer/seat-state stop",
+            "command": "/usr/libexec/claude-seat/seat-state stop",
             "timeout": 10
           },
           {
             "type": "command",
-            "command": "/usr/libexec/developer/ashigaru-hook stop",
+            "command": "/usr/libexec/claude-seat/ashigaru-hook stop",
             "timeout": 10
           }
         ]
@@ -76,12 +76,12 @@
         "hooks": [
           {
             "type": "command",
-            "command": "/usr/libexec/developer/seat-state stop",
+            "command": "/usr/libexec/claude-seat/seat-state stop",
             "timeout": 10
           },
           {
             "type": "command",
-            "command": "/usr/libexec/developer/ashigaru-hook stop",
+            "command": "/usr/libexec/claude-seat/ashigaru-hook stop",
             "timeout": 10
           }
         ]
