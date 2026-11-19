@@ -1,8 +1,9 @@
 name: Container
 
-# The claude image: Josui Prime and the worker seats on dolza and exedore. Build once per change, gate the pushed digest, promote what was
-# tested (constitution container-image VII). Published images are scanned on
-# a schedule by the fleet CVE check (RT #1551), not in this build.
+# The claude image: Josui Prime and the worker seats on dolza and exedore.
+# Build once per change, gate the pushed digest, promote what was tested
+# (constitution container-image VII). Published images are scanned on a
+# schedule by the fleet CVE check (RT #1551), not in this build.
 #
 # `parent-image-updated` is load-bearing: the base is pinned by digest, so
 # the `dnf -y upgrade` in the

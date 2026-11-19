@@ -1,11 +1,12 @@
 # claude — the crunchtools build of Claude Code in a container, for agents
 # that build the fleet and the one that dispatches them
 #
-# Published as `claude` (crunchtools/claude#41; it was `developer`). The image is tooling; who runs in it is decided by
-# the unit's mounts. Josui Prime runs it with Prime's identity and state, as
-# the dispatcher on dolza. The workers (Vertex 1-4 on dolza, Max 1-4 on
-# exedore) run it with the developer identity, their own Trentina profile and
-# their own state, and none of them is given Prime's.
+# Published as `claude`; it was `developer` until crunchtools/claude#41. The
+# image is tooling; who runs in it is decided by the unit's mounts. Josui
+# Prime runs it with Prime's identity and state, as the dispatcher on dolza.
+# The workers (Vertex 1-4 on dolza, Max 1-4 on exedore) run it with the
+# developer identity, their own Trentina profile and their own state, and
+# none of them is given Prime's.
 #
 # It began as Containerfile.dev in crunchtools/josui, sharing that image's
 # entrypoint and mount contract. It lives here now because the two are expected
